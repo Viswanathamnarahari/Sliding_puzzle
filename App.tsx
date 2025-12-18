@@ -253,24 +253,33 @@ const App: React.FC = () => {
 
   const handleGenerateAIImage = async (prompt: string) => {
     if (!prompt) return;
+    const apiKey = (process.env as any).API_KEY;
+    if (!apiKey) {
+      alert("API Key is missing. Image generation requires an environment API key.");
+      return;
+    }
+
     setIsGenerating(true);
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
+      const ai = new GoogleGenAI({ apiKey });
       const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash-image',
         contents: { parts: [{ text: `A beautiful, high-detail, vibrant square image of: ${prompt}. Artistic style, puzzle friendly.` }] }
       });
       
       let foundImage = false;
-      for (const part of response.candidates[0].content.parts) {
-        if (part.inlineData) {
-          const base64 = `data:image/png;base64,${part.inlineData.data}`;
-          setImageUrl(base64);
-          const newHistory = [base64, ...imageHistory.filter(i => i !== base64)].slice(0, 5);
-          setImageHistory(newHistory);
-          localStorage.setItem('puzzle_image_history', JSON.stringify(newHistory));
-          foundImage = true;
-          break;
+      const candidates = (response as any).candidates;
+      if (candidates && candidates[0]?.content?.parts) {
+        for (const part of candidates[0].content.parts) {
+          if (part.inlineData) {
+            const base64 = `data:image/png;base64,${part.inlineData.data}`;
+            setImageUrl(base64);
+            const newHistory = [base64, ...imageHistory.filter(i => i !== base64)].slice(0, 5);
+            setImageHistory(newHistory);
+            localStorage.setItem('puzzle_image_history', JSON.stringify(newHistory));
+            foundImage = true;
+            break;
+          }
         }
       }
       if (!foundImage) alert("AI didn't return an image. Try a different prompt!");
