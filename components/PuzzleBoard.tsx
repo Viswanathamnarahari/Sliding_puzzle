@@ -8,103 +8,77 @@ interface PuzzleBoardProps {
   imageUrl: string;
   onTileClick: (index: number) => void;
   spacing: number;
-  spacingColor: string;
-  showNumbers: boolean;
-  highlightedTile: number | null;
-  clueTile: number | null;
+  movingTileIdx: number | null;
+  clueTileIdx: number | null;
 }
 
 const PuzzleBoard: React.FC<PuzzleBoardProps> = ({ 
-  board, 
-  gridSize, 
-  imageUrl, 
-  onTileClick, 
-  spacing,
-  spacingColor,
-  showNumbers,
-  highlightedTile,
-  clueTile
+  board, gridSize, imageUrl, onTileClick, spacing, movingTileIdx, clueTileIdx 
 }) => {
-  const [containerWidth, setContainerWidth] = useState(360);
+  const [boardSize, setBoardSize] = useState(300);
 
   useEffect(() => {
-    const updateSize = () => {
-      // Fit to screen width with padding, but cap at 500
-      const width = Math.min(window.innerWidth - 48, 500);
-      setContainerWidth(width);
+    const resize = () => {
+      const size = Math.min(window.innerWidth - 40, window.innerHeight * 0.5, 450);
+      setBoardSize(size);
     };
-    updateSize();
-    window.addEventListener('resize', updateSize);
-    return () => window.removeEventListener('resize', updateSize);
+    resize();
+    window.addEventListener('resize', resize);
+    return () => window.removeEventListener('resize', resize);
   }, []);
 
-  const tileWidth = (containerWidth - (gridSize.cols - 1) * spacing) / gridSize.cols;
-  const tileHeight = tileWidth; 
-
-  const boardStyle = {
-    width: containerWidth + 16,
-    height: (tileHeight * gridSize.rows) + (spacing * (gridSize.rows - 1)) + 16,
-    backgroundColor: spacingColor === 'auto' ? 'rgba(255,255,255,0.05)' : spacingColor
-  };
+  const tileW = (boardSize - (gridSize.cols - 1) * spacing) / gridSize.cols;
+  const tileH = (boardSize - (gridSize.rows - 1) * spacing) / gridSize.rows;
 
   return (
     <div 
-      className="relative p-2 rounded-xl shadow-inner border border-white/5 overflow-hidden transition-all duration-500 ease-out"
-      style={boardStyle}
+      className="relative bg-slate-900/50 rounded-2xl shadow-inner border border-white/5 overflow-hidden"
+      style={{ width: boardSize, height: boardSize }}
     >
-      {board.map((tileValue, currentIndex) => {
-        if (tileValue === board.length - 1) return null;
+      {board.map((val, idx) => {
+        if (val === board.length - 1) return null;
 
-        const row = Math.floor(currentIndex / gridSize.cols);
-        const col = currentIndex % gridSize.cols;
+        const row = Math.floor(idx / gridSize.cols);
+        const col = idx % gridSize.cols;
+        const origRow = Math.floor(val / gridSize.cols);
+        const origCol = val % gridSize.cols;
 
-        const originalRow = Math.floor(tileValue / gridSize.cols);
-        const originalCol = tileValue % gridSize.cols;
+        const left = col * (tileW + spacing);
+        const top = row * (tileH + spacing);
 
-        const posX = col * (tileWidth + spacing);
-        const posY = row * (tileHeight + spacing);
-
-        const bgPosX = (originalCol / (gridSize.cols - 1)) * 100;
-        const bgPosY = (originalRow / (gridSize.rows - 1)) * 100;
-
-        const isHighlighted = highlightedTile === currentIndex;
-        const isClue = clueTile === currentIndex;
+        const isMoving = movingTileIdx === idx;
+        const isClue = clueTileIdx === idx;
 
         return (
           <div
-            key={tileValue}
-            onClick={() => onTileClick(currentIndex)}
-            className="absolute puzzle-tile-transition cursor-pointer rounded-lg overflow-hidden group shadow-lg"
+            key={val}
+            onClick={() => onTileClick(idx)}
+            className="absolute puzzle-tile-transition cursor-pointer rounded-lg overflow-hidden border border-white/10 shadow-md group"
             style={{
-              width: tileWidth,
-              height: tileHeight,
-              left: posX + 8,
-              top: posY + 8,
+              width: tileW,
+              height: tileH,
+              transform: `translate(${left}px, ${top}px)`,
               backgroundImage: `url(${imageUrl})`,
               backgroundSize: `${gridSize.cols * 100}% ${gridSize.rows * 100}%`,
-              backgroundPosition: `${bgPosX}% ${bgPosY}%`,
+              backgroundPosition: `${(origCol / (gridSize.cols - 1)) * 100}% ${(origRow / (gridSize.rows - 1)) * 100}%`,
             }}
           >
-            <div className="absolute inset-0 border border-white/10 group-hover:border-white/30 transition-colors" />
-            
-            {showNumbers && (
-              <div className="absolute top-1 left-1 px-1.5 py-0.5 bg-black/40 backdrop-blur-sm rounded text-[10px] font-bold text-white border border-white/10 select-none">
-                {tileValue + 1}
-              </div>
-            )}
-
-            {isHighlighted && (
-              <div className="absolute inset-0 flex items-center justify-center bg-yellow-400/20">
-                <div className="w-12 h-12 rounded-full border-4 border-yellow-400 animate-ping opacity-75" />
-                <div className="w-8 h-8 rounded-full bg-yellow-400 absolute shadow-2xl" />
-              </div>
-            )}
-
+            {/* Clue indicator: yellow dot */}
             {isClue && (
               <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                <div className="w-4 h-4 rounded-full bg-yellow-400 shadow-[0_0_15px_rgba(250,204,21,0.8)] clue-dot" />
+                <div className="w-4 h-4 rounded-full bg-yellow-400 shadow-[0_0_15px_rgba(250,204,21,1)] clue-dot" />
               </div>
             )}
+            
+            {/* Moving indicator: yellow circle */}
+            {isMoving && (
+              <div className="absolute inset-0 flex items-center justify-center bg-yellow-400/20 border-4 border-yellow-400">
+                <div className="w-12 h-12 rounded-full border-2 border-yellow-400 animate-ping" />
+              </div>
+            )}
+
+            {/* Hover overlay */}
+            <div className="absolute inset-0 bg-white/0 group-active:bg-white/20 transition-colors" />
           </div>
         );
       })}

@@ -1,34 +1,30 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { GoogleGenAI } from "@google/genai";
-import { GameState, GridSize, Difficulty, StatsEntry } from './types';
+import { GridSize, Difficulty, StatsEntry } from './types';
 import { isAdjacent, getMovableIndices, isSolved, getManhattanDistance } from './services/puzzleLogic';
 import PuzzleBoard from './components/PuzzleBoard';
 import Controls from './components/Controls';
 import Menu from './components/Menu';
 
-const DEFAULT_IMAGE = 'https://picsum.photos/800/800?random=1';
+const DEFAULT_IMAGE = 'https://picsum.photos/800/800?random=42';
 
 const App: React.FC = () => {
   const [board, setBoard] = useState<number[]>([]);
   const [gridSize, setGridSize] = useState<GridSize>({ rows: 4, cols: 4 });
   const [moves, setMoves] = useState(0);
   const [seconds, setSeconds] = useState(0);
-  const [minMoves, setMinMoves] = useState(0);
+  const [distance, setDistance] = useState(0);
   const [imageUrl, setImageUrl] = useState(DEFAULT_IMAGE);
   const [difficulty, setDifficulty] = useState<Difficulty>('Medium');
   const [spacing, setSpacing] = useState(2);
-  const [spacingColor, setSpacingColor] = useState('transparent');
-  const [showNumbers, setShowNumbers] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isSolving, setIsSolving] = useState(false);
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [highlightedTile, setHighlightedTile] = useState<number | null>(null);
-  const [clueTile, setClueTile] = useState<number | null>(null);
+  const [movingTileIdx, setMovingTileIdx] = useState<number | null>(null);
+  const [clueTileIdx, setClueTileIdx] = useState<number | null>(null);
   const [isGameFinished, setIsGameFinished] = useState(false);
-  const [history, setHistory] = useState<number[][]>([]);
   const [imageHistory, setImageHistory] = useState<string[]>([]);
   
+  const historyRef = useRef<number[][]>([]);
   const timerRef = useRef<number | null>(null);
   const abortSolvingRef = useRef(false);
 
@@ -37,120 +33,126 @@ const App: React.FC = () => {
     setBoard(newBoard);
     setMoves(0);
     setSeconds(0);
-    setMinMoves(0);
-    setHistory([]);
+    setDistance(0);
+    historyRef.current = [];
     setIsGameFinished(false);
-    setClueTile(null);
-    setHighlightedTile(null);
+    setClueTileIdx(null);
+    setMovingTileIdx(null);
     setIsSolving(false);
     abortSolvingRef.current = false;
   }, []);
 
   useEffect(() => {
-    initBoard(gridSize);
     const storedHistory = localStorage.getItem('puzzle_image_history');
     if (storedHistory) setImageHistory(JSON.parse(storedHistory));
-  }, [gridSize, initBoard]);
+    
+    const lastState = localStorage.getItem('puzzle_current_state');
+    if (lastState) {
+        try {
+            const parsed = JSON.parse(lastState);
+            setBoard(parsed.board);
+            setMoves(parsed.moves);
+            setSeconds(parsed.seconds);
+            setImageUrl(parsed.imageUrl);
+            setGridSize(parsed.gridSize);
+            historyRef.current = parsed.history || [];
+            setDifficulty(parsed.difficulty || 'Medium');
+            setSpacing(parsed.spacing || 2);
+            setDistance(getManhattanDistance(parsed.board, parsed.gridSize));
+        } catch(e) {
+            initBoard(gridSize);
+        }
+    } else {
+        initBoard(gridSize);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (board.length > 0) {
+      const stateToSave = { board, moves, seconds, imageUrl, gridSize, history: historyRef.current, difficulty, spacing };
+      localStorage.setItem('puzzle_current_state', JSON.stringify(stateToSave));
+    }
+    setDistance(getManhattanDistance(board, gridSize));
+  }, [board, moves, seconds, imageUrl, gridSize, difficulty, spacing]);
 
   useEffect(() => {
     if (moves > 0 && !isGameFinished && !isSolving) {
-      timerRef.current = window.setInterval(() => {
-        setSeconds(prev => prev + 1);
-      }, 1000);
+      if (!timerRef.current) {
+        timerRef.current = window.setInterval(() => setSeconds(s => s + 1), 1000);
+      }
     } else {
-      if (timerRef.current) clearInterval(timerRef.current);
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
     }
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-    };
+    return () => { if (timerRef.current) clearInterval(timerRef.current); };
   }, [moves, isGameFinished, isSolving]);
 
-  const moveTile = (index: number, silent = false) => {
+  const handleMove = (index: number, silent = false) => {
     if (isSolving && !silent) return;
     const emptyIdx = board.indexOf(board.length - 1);
     if (isAdjacent(index, emptyIdx, gridSize)) {
-      const currentBoardState = [...board];
+      historyRef.current.push([...board]);
       const newBoard = [...board];
       [newBoard[index], newBoard[emptyIdx]] = [newBoard[emptyIdx], newBoard[index]];
-      
-      setHistory(prev => [...prev, currentBoardState]);
       setBoard(newBoard);
-      setMoves(prev => prev + 1);
-      setClueTile(null);
+      setMoves(m => m + 1);
+      setClueTileIdx(null);
 
       if (!silent && isSolved(newBoard)) {
         setIsGameFinished(true);
-        saveToStats(moves + 1, seconds, gridSize);
+        saveStats(moves + 1, seconds, gridSize);
       }
     }
   };
 
-  const saveToStats = (moves: number, time: number, size: GridSize) => {
+  const saveStats = (m: number, t: number, s: GridSize) => {
     const stats: StatsEntry[] = JSON.parse(localStorage.getItem('puzzle_stats') || '[]');
-    const newEntry: StatsEntry = {
-      date: new Date().toLocaleDateString(),
-      moves,
-      time,
-      gridSize: `${size.rows}x${size.cols}`
-    };
-    const updatedStats = [newEntry, ...stats].slice(0, 10);
-    localStorage.setItem('puzzle_stats', JSON.stringify(updatedStats));
+    const entry: StatsEntry = { date: new Date().toLocaleDateString(), moves: m, time: t, gridSize: `${s.rows}x${s.cols}` };
+    const updated = [entry, ...stats].slice(0, 10);
+    localStorage.setItem('puzzle_stats', JSON.stringify(updated));
   };
 
   const shuffle = () => {
     if (isSolving) return;
-    let currentBoard = Array.from({ length: gridSize.rows * gridSize.cols }, (_, i) => i);
-    let shuffleCount = difficulty === 'Easy' ? 15 : difficulty === 'Medium' ? 40 : 100;
+    let curr = Array.from({ length: gridSize.rows * gridSize.cols }, (_, i) => i);
+    const shuffleCount = difficulty === 'Easy' ? 20 : difficulty === 'Medium' ? 50 : 150;
     let lastEmpty = -1;
-    let tempHistory: number[][] = [];
+    historyRef.current = [];
 
     for (let i = 0; i < shuffleCount; i++) {
-      const emptyIdx = currentBoard.indexOf(currentBoard.length - 1);
+      const emptyIdx = curr.indexOf(curr.length - 1);
       const movables = getMovableIndices(emptyIdx, gridSize).filter(idx => idx !== lastEmpty);
       const move = movables[Math.floor(Math.random() * movables.length)];
-      
-      tempHistory.push([...currentBoard]);
-      [currentBoard[emptyIdx], currentBoard[move]] = [currentBoard[move], currentBoard[emptyIdx]];
+      historyRef.current.push([...curr]);
+      [curr[emptyIdx], curr[move]] = [curr[move], curr[emptyIdx]];
       lastEmpty = emptyIdx;
     }
-
-    setBoard(currentBoard);
+    setBoard(curr);
     setMoves(0);
     setSeconds(0);
-    setMinMoves(getManhattanDistance(currentBoard, gridSize));
-    setHistory(tempHistory);
     setIsGameFinished(false);
-    setClueTile(null);
-    setHighlightedTile(null);
+    setClueTileIdx(null);
   };
 
   const undo = () => {
-    if (history.length === 0 || isSolving) return;
-    const prevBoard = history[history.length - 1];
-    setBoard(prevBoard);
-    setHistory(prev => prev.slice(0, -1));
-    setMoves(prev => Math.max(0, prev - 1));
-    setClueTile(null);
+    if (isSolving || historyRef.current.length === 0) return;
+    const last = historyRef.current.pop();
+    if (last) {
+      setBoard(last);
+      setMoves(m => Math.max(0, m - 1));
+      setClueTileIdx(null);
+    }
   };
 
-  const clue = () => {
+  const getClue = () => {
     if (isSolving || isGameFinished) return;
     const emptyIdx = board.indexOf(board.length - 1);
     const movables = getMovableIndices(emptyIdx, gridSize);
-    
-    let lastMovedValue = -1;
-    if (history.length > 0) {
-      const prevBoard = history[history.length - 1];
-      lastMovedValue = prevBoard[emptyIdx];
-    }
-
-    const validClues = movables.filter(idx => board[idx] !== lastMovedValue);
-    
-    const targetIdx = validClues.length > 0 
-      ? validClues[Math.floor(Math.random() * validClues.length)]
-      : movables[Math.floor(Math.random() * movables.length)];
-      
-    setClueTile(targetIdx);
+    // Simple clue: show a valid move
+    const target = movables[Math.floor(Math.random() * movables.length)];
+    setClueTileIdx(target);
   };
 
   const solve = async () => {
@@ -158,249 +160,124 @@ const App: React.FC = () => {
       abortSolvingRef.current = true;
       return;
     }
-    if (isSolved(board)) {
-      setIsGameFinished(true);
-      return;
-    }
-    
+    if (isSolved(board)) return;
     setIsSolving(true);
     abortSolvingRef.current = false;
-    setClueTile(null);
-    const path = [...history].reverse();
     
-    for (const stepBoard of path) {
+    // Reverse the history to solve
+    const steps = [...historyRef.current].reverse();
+    for (const step of steps) {
       if (abortSolvingRef.current) break;
-      const targetEmptyIdx = stepBoard.indexOf(stepBoard.length - 1);
-      setHighlightedTile(targetEmptyIdx);
+      const targetEmpty = step.indexOf(board.length - 1);
+      const movingTileValue = board[targetEmpty];
+      const movingTileCurrentIdx = board.indexOf(movingTileValue);
+      setMovingTileIdx(movingTileCurrentIdx);
       await new Promise(r => setTimeout(r, 1000));
-      if (abortSolvingRef.current) {
-        setHighlightedTile(null);
-        break;
-      }
-      setBoard(stepBoard);
-      setMoves(prev => prev + 1);
-      setHighlightedTile(null);
-      if (isSolved(stepBoard)) break;
+      if (abortSolvingRef.current) break;
+      setBoard(step);
+      setMoves(m => m + 1);
+      setMovingTileIdx(null);
+      if (isSolved(step)) break;
     }
-    
     setIsSolving(false);
-    if (!abortSolvingRef.current && isSolved(board)) {
-      setIsGameFinished(true);
-    }
-    abortSolvingRef.current = false;
+    if (isSolved(board)) setIsGameFinished(true);
   };
 
-  const saveGame = () => {
-    const data = { board, moves, seconds, minMoves, imageUrl, gridSize, history, difficulty, spacing, spacingColor, showNumbers };
-    localStorage.setItem('puzzle_saved_game', JSON.stringify(data));
-    alert('Game state saved to local storage.');
-  };
-
-  const loadSavedGame = () => {
-    const data = localStorage.getItem('puzzle_saved_game');
-    if (data) {
-      const parsed = JSON.parse(data);
-      setBoard(parsed.board);
-      setMoves(parsed.moves);
-      setSeconds(parsed.seconds);
-      setMinMoves(parsed.minMoves || 0);
-      setImageUrl(parsed.imageUrl);
-      setGridSize(parsed.gridSize);
-      setHistory(parsed.history);
-      setDifficulty(parsed.difficulty);
-      setSpacing(parsed.spacing);
-      setSpacingColor(parsed.spacingColor);
-      setShowNumbers(parsed.showNumbers);
-      setIsMenuOpen(false);
-      setIsGameFinished(false);
-      setIsSolving(false);
-    }
-  };
-
-  const exportData = () => {
-    const allData = {
-      savedGame: localStorage.getItem('puzzle_saved_game'),
-      stats: localStorage.getItem('puzzle_stats'),
-      imageHistory: localStorage.getItem('puzzle_image_history')
-    };
-    const blob = new Blob([JSON.stringify(allData)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `lumina_puzzle_backup_${new Date().toISOString().slice(0,10)}.json`;
-    a.click();
-  };
-
-  const importData = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (ev) => {
-        try {
-          const data = JSON.parse(ev.target?.result as string);
-          if (data.savedGame) localStorage.setItem('puzzle_saved_game', data.savedGame);
-          if (data.stats) localStorage.setItem('puzzle_stats', data.stats);
-          if (data.imageHistory) localStorage.setItem('puzzle_image_history', data.imageHistory);
-          alert('Backup imported successfully! Load the game from the menu.');
-          window.location.reload();
-        } catch (err) {
-          alert('Failed to import data. Please check the file.');
-        }
-      };
-      reader.readAsText(file);
-    }
-  };
-
-  const handleGenerateAIImage = async (prompt: string) => {
-    if (!prompt) return;
-    const apiKey = (process.env as any).API_KEY;
-    if (!apiKey) {
-      alert("API Key is missing. Image generation requires an environment API key.");
-      return;
-    }
-
-    setIsGenerating(true);
-    try {
-      const ai = new GoogleGenAI({ apiKey });
-      const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash-image',
-        contents: { parts: [{ text: `A beautiful, high-detail, vibrant square image of: ${prompt}. Artistic style, puzzle friendly.` }] }
-      });
-      
-      let foundImage = false;
-      const candidates = (response as any).candidates;
-      if (candidates && candidates[0]?.content?.parts) {
-        for (const part of candidates[0].content.parts) {
-          if (part.inlineData) {
-            const base64 = `data:image/png;base64,${part.inlineData.data}`;
-            setImageUrl(base64);
-            const newHistory = [base64, ...imageHistory.filter(i => i !== base64)].slice(0, 5);
-            setImageHistory(newHistory);
-            localStorage.setItem('puzzle_image_history', JSON.stringify(newHistory));
-            foundImage = true;
-            break;
-          }
-        }
-      }
-      if (!foundImage) alert("AI didn't return an image. Try a different prompt!");
-    } catch (error) {
-      console.error(error);
-      alert("Failed to generate AI image. Check console for details.");
-    } finally {
-      setIsGenerating(false);
-    }
-  };
-
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const pickImage = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
       reader.onload = (ev) => {
         const url = ev.target?.result as string;
         setImageUrl(url);
-        const newHistory = [url, ...imageHistory.filter(i => i !== url)].slice(0, 5);
-        setImageHistory(newHistory);
-        localStorage.setItem('puzzle_image_history', JSON.stringify(newHistory));
+        const updated = [url, ...imageHistory.filter(x => x !== url)].slice(0, 10);
+        setImageHistory(updated);
+        localStorage.setItem('puzzle_image_history', JSON.stringify(updated));
       };
       reader.readAsDataURL(file);
     }
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-4 relative bg-slate-950 text-white overflow-hidden">
+    <div className="flex flex-col items-center justify-between h-full w-full py-2 px-4 bg-slate-950 overflow-hidden">
       <button 
         onClick={() => setIsMenuOpen(true)}
-        className="absolute top-6 left-6 p-2 rounded-full bg-slate-800/50 hover:bg-slate-700 transition-colors z-40"
+        className="absolute top-4 left-4 p-3 rounded-full bg-slate-800 hover:bg-slate-700 transition-colors z-40 shadow-lg"
       >
-        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>
       </button>
 
-      <div className="mb-4 flex space-x-6 text-sm font-medium tracking-wider uppercase text-slate-400">
-        <div className="flex flex-col items-center">
-          <span className="text-xl text-white font-bold">{moves}</span>
-          <span className="text-[10px]">Moves</span>
-        </div>
-        <div className="flex flex-col items-center">
-          <span className="text-xl text-white font-bold">
-            {Math.floor(seconds / 60)}:{(seconds % 60).toString().padStart(2, '0')}
-          </span>
-          <span className="text-[10px]">Time</span>
-        </div>
-        <div className="flex flex-col items-center">
-          <span className="text-xl text-blue-400 font-bold">{minMoves}</span>
-          <span className="text-[10px]">Best</span>
+      <div className="text-center mt-2">
+        <h1 className="text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-indigo-500 tracking-tighter mb-1">PUZZLE MASTER</h1>
+        <div className="flex gap-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest justify-center">
+            <div className="flex flex-col items-center">
+                <span className="text-white text-base">{moves}</span>
+                <span>Moves</span>
+            </div>
+            <div className="flex flex-col items-center">
+                <span className="text-white text-base">{Math.floor(seconds/60)}:{(seconds%60).toString().padStart(2,'0')}</span>
+                <span>Time</span>
+            </div>
         </div>
       </div>
 
-      <div className="flex-1 flex items-center justify-center w-full max-w-full overflow-hidden">
+      <div className="flex-1 flex items-center justify-center w-full min-h-0 py-2">
         <PuzzleBoard 
           board={board} 
           gridSize={gridSize} 
           imageUrl={imageUrl} 
-          onTileClick={moveTile} 
+          onTileClick={handleMove}
           spacing={spacing}
-          spacingColor={spacingColor}
-          showNumbers={showNumbers}
-          highlightedTile={highlightedTile}
-          clueTile={clueTile}
+          movingTileIdx={movingTileIdx}
+          clueTileIdx={clueTileIdx}
         />
       </div>
 
-      <div className="mt-6 w-full max-w-lg">
+      <div className="w-full max-w-sm mb-2">
         <Controls 
           onShuffle={shuffle}
           onSolve={solve}
-          onClue={clue}
+          onClue={getClue}
           onUndo={undo}
           isSolving={isSolving}
         />
       </div>
 
       {isGameFinished && (
-        <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-md flex items-center justify-center z-50 p-6">
-          <div className="bg-slate-900 border border-slate-800 p-8 rounded-2xl max-w-sm w-full text-center shadow-2xl animate-in zoom-in duration-300">
-            <h2 className="text-3xl font-bold mb-2">Victory!</h2>
-            <p className="text-slate-400 mb-6">You solved it in {moves} moves.</p>
-            <div className="space-y-3">
-              <button 
-                onClick={() => {
-                  initBoard(gridSize);
-                  shuffle();
-                }}
-                className="w-full py-3 bg-blue-600 hover:bg-blue-500 rounded-xl font-semibold transition-colors shadow-lg shadow-blue-500/20"
-              >
-                New Game
-              </button>
-              <button onClick={() => setIsGameFinished(false)} className="w-full py-3 bg-slate-800 hover:bg-slate-700 rounded-xl font-semibold transition-colors">
-                Back to Board
-              </button>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
+            <div className="bg-slate-900 border border-slate-700 p-8 rounded-3xl shadow-2xl text-center max-w-xs mx-auto">
+                <h2 className="text-2xl font-bold mb-2">Victory!</h2>
+                <p className="text-slate-400 mb-6">Do you want to play again?</p>
+                <div className="flex flex-col gap-3">
+                    <button 
+                        onClick={() => { initBoard(gridSize); shuffle(); }}
+                        className="w-full py-4 bg-blue-600 hover:bg-blue-500 rounded-2xl font-bold shadow-lg transition-all"
+                    >
+                        PLAY AGAIN
+                    </button>
+                    <button 
+                        onClick={() => setIsGameFinished(false)}
+                        className="w-full py-4 bg-slate-800 hover:bg-slate-700 rounded-2xl font-bold text-slate-300 transition-all"
+                    >
+                        CLOSE
+                    </button>
+                </div>
             </div>
-          </div>
         </div>
       )}
 
       <Menu 
-        isOpen={isMenuOpen} 
+        isOpen={isMenuOpen}
         onClose={() => setIsMenuOpen(false)}
         gridSize={gridSize}
-        setGridSize={setGridSize}
+        setGridSize={(s) => { setGridSize(s); initBoard(s); }}
         difficulty={difficulty}
         setDifficulty={setDifficulty}
         spacing={spacing}
         setSpacing={setSpacing}
-        spacingColor={spacingColor}
-        setSpacingColor={setSpacingColor}
-        showNumbers={showNumbers}
-        setShowNumbers={setShowNumbers}
-        onImageUpload={handleImageUpload}
         imageHistory={imageHistory}
         onSelectHistoryImage={setImageUrl}
-        onSave={saveGame}
-        onLoad={loadSavedGame}
-        onExport={exportData}
-        onImport={importData}
-        onGenerateAI={handleGenerateAIImage}
-        isGenerating={isGenerating}
+        onPickImage={pickImage}
       />
     </div>
   );
