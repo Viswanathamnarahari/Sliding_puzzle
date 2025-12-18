@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { GridSize } from '../types';
 
 interface PuzzleBoardProps {
@@ -25,7 +25,19 @@ const PuzzleBoard: React.FC<PuzzleBoardProps> = ({
   highlightedTile,
   clueTile
 }) => {
-  const containerWidth = 400; 
+  const [containerWidth, setContainerWidth] = useState(360);
+
+  useEffect(() => {
+    const updateSize = () => {
+      // Fit to screen width with padding, but cap at 500
+      const width = Math.min(window.innerWidth - 48, 500);
+      setContainerWidth(width);
+    };
+    updateSize();
+    window.addEventListener('resize', updateSize);
+    return () => window.removeEventListener('resize', updateSize);
+  }, []);
+
   const tileWidth = (containerWidth - (gridSize.cols - 1) * spacing) / gridSize.cols;
   const tileHeight = tileWidth; 
 
@@ -37,7 +49,7 @@ const PuzzleBoard: React.FC<PuzzleBoardProps> = ({
 
   return (
     <div 
-      className="relative p-2 rounded-xl shadow-inner border border-white/5 overflow-hidden transition-colors duration-500"
+      className="relative p-2 rounded-xl shadow-inner border border-white/5 overflow-hidden transition-all duration-500 ease-out"
       style={boardStyle}
     >
       {board.map((tileValue, currentIndex) => {
@@ -73,17 +85,14 @@ const PuzzleBoard: React.FC<PuzzleBoardProps> = ({
               backgroundPosition: `${bgPosX}% ${bgPosY}%`,
             }}
           >
-            {/* Tile Border Overlay */}
             <div className="absolute inset-0 border border-white/10 group-hover:border-white/30 transition-colors" />
             
-            {/* Tile Number */}
             {showNumbers && (
               <div className="absolute top-1 left-1 px-1.5 py-0.5 bg-black/40 backdrop-blur-sm rounded text-[10px] font-bold text-white border border-white/10 select-none">
                 {tileValue + 1}
               </div>
             )}
 
-            {/* Highlight (Solving) */}
             {isHighlighted && (
               <div className="absolute inset-0 flex items-center justify-center bg-yellow-400/20">
                 <div className="w-12 h-12 rounded-full border-4 border-yellow-400 animate-ping opacity-75" />
@@ -91,7 +100,6 @@ const PuzzleBoard: React.FC<PuzzleBoardProps> = ({
               </div>
             )}
 
-            {/* Clue Dot */}
             {isClue && (
               <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                 <div className="w-4 h-4 rounded-full bg-yellow-400 shadow-[0_0_15px_rgba(250,204,21,0.8)] clue-dot" />
