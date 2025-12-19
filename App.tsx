@@ -11,6 +11,7 @@ const App: React.FC = () => {
   const [board, setBoard] = useState<number[]>([]);
   const [gridSize, setGridSize] = useState<GridSize>({ rows: 4, cols: 4 });
   const [moves, setMoves] = useState(0);
+  const [requiredMoves, setRequiredMoves] = useState(0);
   const [seconds, setSeconds] = useState(0);
   const [distance, setDistance] = useState(0);
   const [imageUrl, setImageUrl] = useState(DEFAULT_IMAGE);
@@ -55,6 +56,7 @@ const App: React.FC = () => {
     const newBoard = Array.from({ length: size.rows * size.cols }, (_, i) => i);
     setBoard(newBoard);
     setMoves(0);
+    setRequiredMoves(0);
     setSeconds(0);
     setDistance(0);
     setHasShuffled(false);
@@ -74,6 +76,7 @@ const App: React.FC = () => {
             const parsed = JSON.parse(lastState);
             setBoard(parsed.board);
             setMoves(parsed.moves);
+            setRequiredMoves(parsed.requiredMoves || 0);
             setSeconds(parsed.seconds);
             setImageUrl(parsed.imageUrl);
             setGridSize(parsed.gridSize);
@@ -108,7 +111,7 @@ const App: React.FC = () => {
   useEffect(() => {
     if (board.length > 0) {
       const stateToSave = { 
-        board, moves, seconds, imageUrl, gridSize, 
+        board, moves, requiredMoves, seconds, imageUrl, gridSize, 
         history: historyRef.current, difficulty, spacing, 
         showNumbers, hasShuffled 
       };
@@ -116,15 +119,10 @@ const App: React.FC = () => {
         localStorage.setItem('puzzle_current_state', JSON.stringify(stateToSave));
       } catch (e) {
         localStorage.removeItem('puzzle_image_history');
-        try {
-            localStorage.setItem('puzzle_current_state', JSON.stringify(stateToSave));
-        } catch (inner) {
-            console.error("Storage completely failed");
-        }
       }
     }
     setDistance(getManhattanDistance(board, gridSize));
-  }, [board, moves, seconds, imageUrl, gridSize, difficulty, spacing, showNumbers, hasShuffled]);
+  }, [board, moves, requiredMoves, seconds, imageUrl, gridSize, difficulty, spacing, showNumbers, hasShuffled]);
 
   useEffect(() => {
     if (moves > 0 && !isGameFinished && !isSolving) {
@@ -156,18 +154,29 @@ const App: React.FC = () => {
   const handleMove = (index: number, silent = false) => {
     if (isSolving && !silent) return;
     const emptyIdx = board.indexOf(board.length - 1);
+    
     if (isAdjacent(index, emptyIdx, gridSize)) {
-      const prevBoard = [...board];
-      historyRef.current.push(prevBoard);
-      const newBoard = [...board];
-      [newBoard[index], newBoard[emptyIdx]] = [newBoard[emptyIdx], newBoard[index]];
-      setBoard(newBoard);
+      const currentBoard = [...board];
+      const nextBoard = [...board];
+      [nextBoard[index], nextBoard[emptyIdx]] = [nextBoard[emptyIdx], nextBoard[index]];
+      
+      // Determine if this move is backtracking along the known path
+      const previousState = historyRef.current[historyRef.current.length - 1];
+      const isBacktracking = previousState && previousState.every((val, i) => val === nextBoard[i]);
+
+      if (isBacktracking) {
+        historyRef.current.pop();
+      } else {
+        historyRef.current.push(currentBoard);
+      }
+
+      setBoard(nextBoard);
       
       if (!silent) {
         const nextMoves = moves + 1;
         setMoves(nextMoves);
         setClueTileIdx(null);
-        if (isSolved(newBoard) && hasShuffled && nextMoves > 0) {
+        if (isSolved(nextBoard) && hasShuffled && nextMoves > 0) {
           setIsGameFinished(true);
           saveStats(nextMoves, seconds, gridSize);
         }
@@ -193,6 +202,7 @@ const App: React.FC = () => {
     }
     setBoard(curr);
     setMoves(0);
+    setRequiredMoves(shuffleCount);
     setSeconds(0);
     setClueTileIdx(null);
     setHasShuffled(true);
@@ -203,30 +213,21 @@ const App: React.FC = () => {
     const last = historyRef.current.pop();
     if (last) {
       setBoard(last);
-      setMoves(m => Math.max(0, m - 1));
+      setMoves(m => m + 1); // Undo is still a move action
       setClueTileIdx(null);
       setIsGameFinished(false);
     }
   };
 
   const getClue = () => {
-    if (isSolving || isGameFinished || !hasShuffled) return;
-    const emptyIdx = board.indexOf(board.length - 1);
-    const movables = getMovableIndices(emptyIdx, gridSize);
+    if (isSolving || isGameFinished || !hasShuffled || historyRef.current.length === 0) return;
     
-    let bestIdx = movables[0];
-    let minDistance = Infinity;
+    // Suggest the move that leads back to the previous state in our history
+    const previousState = historyRef.current[historyRef.current.length - 1];
+    const emptyIdxInPrevious = previousState.indexOf(board.length - 1);
     
-    for (const idx of movables) {
-        const tempBoard = [...board];
-        [tempBoard[idx], tempBoard[emptyIdx]] = [tempBoard[emptyIdx], tempBoard[idx]];
-        const d = getManhattanDistance(tempBoard, gridSize);
-        if (d < minDistance) {
-            minDistance = d;
-            bestIdx = idx;
-        }
-    }
-    setClueTileIdx(bestIdx);
+    // The tile currently at the 'old' empty index is the one that needs to move
+    setClueTileIdx(emptyIdxInPrevious);
   };
 
   const solve = async () => {
@@ -239,32 +240,24 @@ const App: React.FC = () => {
     setIsSolving(true);
     abortSolvingRef.current = false;
     
-    const steps = [...historyRef.current].reverse();
-    let currentBoardState = [...board];
-    let simulatedMoves = moves;
-
-    for (const step of steps) {
-      if (abortSolvingRef.current) break;
+    while (historyRef.current.length > 0 && !abortSolvingRef.current) {
+      const previousState = historyRef.current[historyRef.current.length - 1];
+      const emptyIdxInPrevious = previousState.indexOf(board.length - 1);
       
-      const targetEmptyIdx = step.indexOf(board.length - 1);
-      const tileToMoveValue = currentBoardState[targetEmptyIdx];
-      const currentTileIdx = currentBoardState.indexOf(tileToMoveValue);
-      
-      setMovingTileIdx(currentTileIdx);
+      setMovingTileIdx(emptyIdxInPrevious);
       await new Promise(r => setTimeout(r, 1000));
       
       if (abortSolvingRef.current) break;
       
-      currentBoardState = [...step];
-      simulatedMoves++;
-      
-      setBoard(currentBoardState);
-      setMoves(simulatedMoves);
+      const nextBoard = [...previousState];
+      setBoard(nextBoard);
+      historyRef.current.pop();
+      setMoves(m => m + 1);
       setMovingTileIdx(null);
       
-      if (isSolved(currentBoardState)) {
+      if (isSolved(nextBoard)) {
           setIsGameFinished(true);
-          saveStats(simulatedMoves, seconds, gridSize);
+          saveStats(moves + 1, seconds, gridSize);
           break;
       }
     }
@@ -327,20 +320,24 @@ const App: React.FC = () => {
 
       <div className="text-center mt-2 flex flex-col items-center">
         <h1 className="text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-indigo-500 tracking-tighter mb-1 uppercase">Puzzle Master</h1>
-        <div className="flex gap-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest justify-center">
-            <div className="flex flex-col items-center">
+        <div className="flex gap-4 text-[9px] font-bold text-slate-400 uppercase tracking-widest justify-center">
+            <div className="flex flex-col items-center px-1">
                 <span className="text-white text-base leading-none mb-1">{moves}</span>
                 <span>Moves</span>
             </div>
-            <div className="flex flex-col items-center">
-                <span className="text-blue-400 text-base leading-none mb-1 font-black">{bestMoves !== null ? bestMoves : '--'}</span>
-                <span>Min Moves</span>
+            <div className="flex flex-col items-center px-1">
+                <span className="text-emerald-400 text-base leading-none mb-1 font-black">{requiredMoves > 0 ? requiredMoves : '--'}</span>
+                <span>Target</span>
             </div>
-            <div className="flex flex-col items-center">
+            <div className="flex flex-col items-center px-1">
+                <span className="text-blue-400 text-base leading-none mb-1 font-black">{bestMoves !== null ? bestMoves : '--'}</span>
+                <span>Best</span>
+            </div>
+            <div className="flex flex-col items-center px-1">
                 <span className="text-white text-base leading-none mb-1">{distance}</span>
                 <span>Distance</span>
             </div>
-            <div className="flex flex-col items-center">
+            <div className="flex flex-col items-center px-1">
                 <span className="text-white text-base leading-none mb-1">{Math.floor(seconds/60)}:{(seconds%60).toString().padStart(2,'0')}</span>
                 <span>Time</span>
             </div>
@@ -360,7 +357,7 @@ const App: React.FC = () => {
         />
       </div>
 
-      <div className="w-full max-w-sm mb-4">
+      <div className="w-full max-sm mb-4">
         <Controls 
           onShuffle={shuffle}
           onSolve={solve}
@@ -377,7 +374,8 @@ const App: React.FC = () => {
                     <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg>
                 </div>
                 <h2 className="text-2xl font-black mb-2 text-white uppercase tracking-tighter">Solved!</h2>
-                <p className="text-slate-400 text-sm mb-6">Excellent work! You finished in {moves} moves.</p>
+                <p className="text-slate-400 text-sm mb-2">Excellent work! You finished in {moves} moves.</p>
+                <p className="text-blue-400 text-xs font-bold mb-6 uppercase tracking-widest">Do you want to play again?</p>
                 <div className="flex flex-col gap-3">
                     <button 
                         onClick={() => { shuffle(); }}
