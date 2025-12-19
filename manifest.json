@@ -1,6 +1,7 @@
+
 {
-  "name": "Lumina Puzzle Master",
-  "short_name": "Lumina Puzzle",
+  "name": "R3AL Puzzle",
+  "short_name": "R3AL Puzzle",
   "description": "Advanced sliding puzzle with image support and auto-solve.",
   "start_url": "/",
   "scope": "/",

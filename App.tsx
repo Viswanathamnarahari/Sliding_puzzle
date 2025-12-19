@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { GridSize, Difficulty, StatsEntry, TileShape } from './types';
 import { isAdjacent, getMovableIndices, isSolved, getManhattanDistance } from './services/puzzleLogic';
@@ -350,7 +351,7 @@ const App: React.FC = () => {
                 <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>
             </button>
             <h1 className="text-2xl font-black text-white/95 tracking-tighter uppercase flex items-center gap-2">
-                <span className="opacity-30">LUMINA</span> 
+                <span className="opacity-30">R3AL</span> 
                 <span className="text-blue-500 drop-shadow-[0_0_12px_rgba(59,130,246,0.4)]">PUZZLE</span>
             </h1>
             <div className="w-[50px]"></div>

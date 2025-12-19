@@ -108,7 +108,7 @@ const Menu: React.FC<MenuProps> = ({
         <section>
             <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em] mb-3">SELECT GRID</h3>
             <div className="grid grid-cols-3 gap-2">
-                {[ {r:3, c:3}, {r:4, c:4}, {r:5, c:4} ].map((g, i) => (
+                {[ {r:3, c:3}, {r:4, c:4}, {r:5, c:5} ].map((g, i) => (
                     <button 
                         key={i} 
                         onClick={() => { setGridSize({rows: g.r, cols: g.c}); onClose(); }}
