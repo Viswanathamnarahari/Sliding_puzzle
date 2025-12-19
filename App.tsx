@@ -24,23 +24,29 @@ const App: React.FC = () => {
   const [isGameFinished, setIsGameFinished] = useState(false);
   const [imageHistory, setImageHistory] = useState<string[]>([]);
   const [bestMoves, setBestMoves] = useState<number | null>(null);
+  const [hasShuffled, setHasShuffled] = useState(false);
   
   const historyRef = useRef<number[][]>([]);
   const timerRef = useRef<number | null>(null);
   const abortSolvingRef = useRef(false);
 
   const updateBestMoves = useCallback(() => {
-    const rawStats = localStorage.getItem('puzzle_stats');
-    if (!rawStats) {
-      setBestMoves(null);
-      return;
-    }
-    const stats: StatsEntry[] = JSON.parse(rawStats);
-    const relevant = stats.filter(s => s.gridSize === `${gridSize.rows}x${gridSize.cols}`);
-    if (relevant.length > 0) {
-      const min = Math.min(...relevant.map(r => r.moves));
-      setBestMoves(min);
-    } else {
+    try {
+      const rawStats = localStorage.getItem('puzzle_stats');
+      if (!rawStats) {
+        setBestMoves(null);
+        return;
+      }
+      const stats: StatsEntry[] = JSON.parse(rawStats);
+      const gridKey = `${gridSize.rows}x${gridSize.cols}`;
+      const relevant = stats.filter(s => s.gridSize === gridKey);
+      if (relevant.length > 0) {
+        const min = Math.min(...relevant.map(r => r.moves));
+        setBestMoves(min);
+      } else {
+        setBestMoves(null);
+      }
+    } catch (e) {
       setBestMoves(null);
     }
   }, [gridSize]);
@@ -51,6 +57,7 @@ const App: React.FC = () => {
     setMoves(0);
     setSeconds(0);
     setDistance(0);
+    setHasShuffled(false);
     historyRef.current = [];
     setIsGameFinished(false);
     setClueTileIdx(null);
@@ -74,9 +81,9 @@ const App: React.FC = () => {
             setDifficulty(parsed.difficulty || 'Medium');
             setSpacing(parsed.spacing || 2);
             setShowNumbers(parsed.showNumbers ?? true);
+            setHasShuffled(parsed.hasShuffled ?? false);
             setDistance(getManhattanDistance(parsed.board, parsed.gridSize));
-            // Only show finished if moves > 0 and solved
-            setIsGameFinished(isSolved(parsed.board) && parsed.moves > 0);
+            setIsGameFinished(isSolved(parsed.board) && (parsed.hasShuffled || parsed.moves > 0));
         } catch(e) {
             initBoard(gridSize);
         }
@@ -88,17 +95,33 @@ const App: React.FC = () => {
 
   useEffect(() => {
     const storedHistory = localStorage.getItem('puzzle_image_history');
-    if (storedHistory) setImageHistory(JSON.parse(storedHistory));
+    if (storedHistory) {
+      try {
+        setImageHistory(JSON.parse(storedHistory));
+      } catch (e) {
+        setImageHistory([]);
+      }
+    }
     loadSavedState();
   }, []);
 
   useEffect(() => {
     if (board.length > 0) {
-      const stateToSave = { board, moves, seconds, imageUrl, gridSize, history: historyRef.current, difficulty, spacing, showNumbers };
-      localStorage.setItem('puzzle_current_state', JSON.stringify(stateToSave));
+      const stateToSave = { 
+        board, moves, seconds, imageUrl, gridSize, 
+        history: historyRef.current, difficulty, spacing, 
+        showNumbers, hasShuffled 
+      };
+      try {
+        localStorage.setItem('puzzle_current_state', JSON.stringify(stateToSave));
+      } catch (e) {
+        // If quota exceeded, clear history and try again
+        localStorage.removeItem('puzzle_image_history');
+        localStorage.setItem('puzzle_current_state', JSON.stringify(stateToSave));
+      }
     }
     setDistance(getManhattanDistance(board, gridSize));
-  }, [board, moves, seconds, imageUrl, gridSize, difficulty, spacing, showNumbers]);
+  }, [board, moves, seconds, imageUrl, gridSize, difficulty, spacing, showNumbers, hasShuffled]);
 
   useEffect(() => {
     if (moves > 0 && !isGameFinished && !isSolving) {
@@ -114,6 +137,19 @@ const App: React.FC = () => {
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
   }, [moves, isGameFinished, isSolving]);
 
+  const saveStats = useCallback((m: number, t: number, s: GridSize) => {
+    const stats: StatsEntry[] = JSON.parse(localStorage.getItem('puzzle_stats') || '[]');
+    const entry: StatsEntry = { 
+      date: new Date().toLocaleDateString(), 
+      moves: m, 
+      time: t, 
+      gridSize: `${s.rows}x${s.cols}` 
+    };
+    const updated = [entry, ...stats].sort((a,b) => a.moves - b.moves).slice(0, 50);
+    localStorage.setItem('puzzle_stats', JSON.stringify(updated));
+    updateBestMoves();
+  }, [updateBestMoves]);
+
   const handleMove = (index: number, silent = false) => {
     if (isSolving && !silent) return;
     const emptyIdx = board.indexOf(board.length - 1);
@@ -127,25 +163,13 @@ const App: React.FC = () => {
         const nextMoves = moves + 1;
         setMoves(nextMoves);
         setClueTileIdx(null);
-        if (isSolved(newBoard)) {
+        // CRITICAL: Strict modal guard
+        if (isSolved(newBoard) && hasShuffled && nextMoves > 0) {
           setIsGameFinished(true);
           saveStats(nextMoves, seconds, gridSize);
         }
       }
     }
-  };
-
-  const saveStats = (m: number, t: number, s: GridSize) => {
-    const stats: StatsEntry[] = JSON.parse(localStorage.getItem('puzzle_stats') || '[]');
-    const entry: StatsEntry = { 
-      date: new Date().toLocaleDateString(), 
-      moves: m, 
-      time: t, 
-      gridSize: `${s.rows}x${s.cols}` 
-    };
-    const updated = [entry, ...stats].sort((a,b) => a.moves - b.moves).slice(0, 50);
-    localStorage.setItem('puzzle_stats', JSON.stringify(updated));
-    updateBestMoves();
   };
 
   const shuffle = () => {
@@ -168,6 +192,7 @@ const App: React.FC = () => {
     setMoves(0);
     setSeconds(0);
     setClueTileIdx(null);
+    setHasShuffled(true);
   };
 
   const undo = () => {
@@ -181,7 +206,7 @@ const App: React.FC = () => {
   };
 
   const getClue = () => {
-    if (isSolving || isGameFinished) return;
+    if (isSolving || isGameFinished || !hasShuffled) return;
     const emptyIdx = board.indexOf(board.length - 1);
     const movables = getMovableIndices(emptyIdx, gridSize);
     
@@ -205,7 +230,7 @@ const App: React.FC = () => {
       abortSolvingRef.current = true;
       return;
     }
-    if (isSolved(board)) return;
+    if (isSolved(board) || !hasShuffled) return;
     setIsSolving(true);
     abortSolvingRef.current = false;
     
@@ -226,7 +251,7 @@ const App: React.FC = () => {
       if (isSolved(step)) break;
     }
     setIsSolving(false);
-    if (isSolved(board)) {
+    if (isSolved(board) && hasShuffled) {
         setIsGameFinished(true);
         saveStats(moves, seconds, gridSize);
     }
@@ -238,10 +263,9 @@ const App: React.FC = () => {
       const reader = new FileReader();
       reader.onload = (ev) => {
         const img = new Image();
-        img.crossOrigin = "anonymous";
         img.onload = () => {
             const canvas = document.createElement('canvas');
-            const MAX_SIZE = 1280;
+            const MAX_SIZE = 600; // Drastically reduced for quota safety
             let width = img.width;
             let height = img.height;
             if (width > height) {
@@ -261,13 +285,15 @@ const App: React.FC = () => {
             if (ctx) {
               ctx.drawImage(img, 0, 0, width, height);
               try {
-                const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+                const dataUrl = canvas.toDataURL('image/jpeg', 0.5); // 0.5 quality saves huge space
                 setImageUrl(dataUrl);
-                const updated = [dataUrl, ...imageHistory.filter(x => x !== dataUrl)].slice(0, 10);
+                // Limit history to 3 to avoid blank screens/crashes
+                const updated = [dataUrl, ...imageHistory.filter(x => x !== dataUrl)].slice(0, 3);
                 setImageHistory(updated);
                 localStorage.setItem('puzzle_image_history', JSON.stringify(updated));
               } catch (err) {
-                console.error("Canvas toDataURL failed:", err);
+                console.warn("Storage full, clearing history...");
+                localStorage.removeItem('puzzle_image_history');
               }
             }
         };
@@ -275,6 +301,7 @@ const App: React.FC = () => {
       };
       reader.readAsDataURL(file);
     }
+    e.target.value = '';
   };
 
   return (
@@ -294,7 +321,7 @@ const App: React.FC = () => {
                 <span>Moves</span>
             </div>
             <div className="flex flex-col items-center">
-                <span className="text-blue-400 text-base leading-none mb-1 font-black">{bestMoves ?? '--'}</span>
+                <span className="text-blue-400 text-base leading-none mb-1 font-black">{bestMoves !== null ? bestMoves : '--'}</span>
                 <span>Best</span>
             </div>
             <div className="flex flex-col items-center">
@@ -338,13 +365,13 @@ const App: React.FC = () => {
                     <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg>
                 </div>
                 <h2 className="text-2xl font-black mb-2 text-white uppercase tracking-tighter">Solved!</h2>
-                <p className="text-slate-400 text-sm mb-4">You solved it in {moves} moves!</p>
+                <p className="text-slate-400 text-sm mb-6">You solved it in {moves} moves!</p>
                 <div className="flex flex-col gap-3">
                     <button 
                         onClick={() => { shuffle(); }}
                         className="w-full py-4 bg-blue-600 hover:bg-blue-500 rounded-2xl font-black text-sm tracking-widest transition-all shadow-lg active:scale-95"
                     >
-                        RESTART PUZZLE
+                        PLAY AGAIN
                     </button>
                     <button 
                         onClick={() => setIsGameFinished(false)}
