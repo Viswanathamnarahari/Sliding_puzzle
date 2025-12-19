@@ -6,15 +6,16 @@ interface ControlsProps {
   onClue: () => void;
   onUndo: () => void;
   isSolving: boolean;
+  canUndo: boolean;
 }
 
-const Controls: React.FC<ControlsProps> = ({ onShuffle, onSolve, onClue, onUndo, isSolving }) => {
+const Controls: React.FC<ControlsProps> = ({ onShuffle, onSolve, onClue, onUndo, isSolving, canUndo }) => {
   return (
     <div className="grid grid-cols-2 gap-3">
       <button 
         onClick={onShuffle} 
         disabled={isSolving}
-        className="flex items-center justify-center gap-2 py-4 bg-white/5 border border-white/5 rounded-2xl font-bold uppercase tracking-widest text-[10px] text-white/70 hover:bg-white/10 hover:text-white active:scale-95 transition-all disabled:opacity-50"
+        className="flex items-center justify-center gap-2 py-4 bg-white/5 border border-white/5 rounded-2xl font-bold uppercase tracking-widest text-[10px] text-white/70 hover:bg-white/10 hover:text-white active:scale-95 transition-all disabled:opacity-30 disabled:pointer-events-none"
       >
         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m21 16-4 4-4-4"/><path d="M17 20V4"/><path d="m3 8 4-4 4 4"/><path d="M7 4v16"/></svg>
         Shuffle
@@ -23,7 +24,7 @@ const Controls: React.FC<ControlsProps> = ({ onShuffle, onSolve, onClue, onUndo,
       <button 
         onClick={onClue}
         disabled={isSolving}
-        className="flex items-center justify-center gap-2 py-4 bg-amber-500/10 border border-amber-500/20 text-amber-500 rounded-2xl font-bold uppercase tracking-widest text-[10px] hover:bg-amber-500/20 active:scale-95 transition-all disabled:opacity-50"
+        className="flex items-center justify-center gap-2 py-4 bg-amber-500/10 border border-amber-500/20 text-amber-500 rounded-2xl font-bold uppercase tracking-widest text-[10px] hover:bg-amber-500/20 active:scale-95 transition-all disabled:opacity-30 disabled:pointer-events-none"
       >
         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
         Clue
@@ -31,8 +32,8 @@ const Controls: React.FC<ControlsProps> = ({ onShuffle, onSolve, onClue, onUndo,
 
       <button 
         onClick={onUndo}
-        disabled={isSolving}
-        className="flex items-center justify-center gap-2 py-4 bg-white/5 border border-white/5 rounded-2xl font-bold uppercase tracking-widest text-[10px] text-white/70 hover:bg-white/10 hover:text-white active:scale-95 transition-all disabled:opacity-50"
+        disabled={!canUndo}
+        className="flex items-center justify-center gap-2 py-4 bg-white/5 border border-white/5 rounded-2xl font-bold uppercase tracking-widest text-[10px] text-white/70 hover:bg-white/10 hover:text-white active:scale-95 transition-all disabled:opacity-30 disabled:pointer-events-none"
       >
         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 10h10a8 8 0 0 1 8 8v2"/><path d="m3 10 7-7"/><path d="m3 10 7 7"/></svg>
         Undo

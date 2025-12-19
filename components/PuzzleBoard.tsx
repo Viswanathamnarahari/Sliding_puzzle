@@ -20,8 +20,12 @@ const PuzzleBoard: React.FC<PuzzleBoardProps> = ({
 
   useEffect(() => {
     const resize = () => {
-      // Fit within tray well boundaries
-      const size = Math.min(window.innerWidth - 80, window.innerHeight * 0.45, 380);
+      // Optimized for mobile: uses 90% of screen width or 50% of screen height
+      const size = Math.min(
+        window.innerWidth - 32, 
+        window.innerHeight - 340, 
+        420
+      );
       setBoardSize(size);
     };
     resize();
@@ -32,12 +36,12 @@ const PuzzleBoard: React.FC<PuzzleBoardProps> = ({
   const tileW = (boardSize - (gridSize.cols - 1) * spacing) / gridSize.cols;
   const tileH = (boardSize - (gridSize.rows - 1) * spacing) / gridSize.rows;
 
-  // Determine border radius based on tileShape
-  const borderRadius = tileShape === 'rounded' ? '0.75rem' : '0px';
+  // Fixed pixel radius looks better than % on different grid proportions
+  const borderRadius = tileShape === 'rounded' ? '10px' : '0px';
 
   return (
     <div 
-      className="relative overflow-hidden"
+      className="relative select-none"
       style={{ width: boardSize, height: boardSize }}
     >
       {board.map((val, idx) => {
@@ -58,11 +62,11 @@ const PuzzleBoard: React.FC<PuzzleBoardProps> = ({
           <div
             key={val}
             onClick={() => onTileClick(idx)}
-            className="absolute puzzle-tile-transition cursor-pointer overflow-hidden border border-white/10 shadow-lg group"
+            className="absolute puzzle-tile-transition cursor-pointer overflow-hidden border border-white/10 shadow-lg group active:brightness-125 touch-manipulation"
             style={{
               width: tileW,
               height: tileH,
-              transform: `translate(${left}px, ${top}px)`,
+              transform: `translate3d(${left}px, ${top}px, 0)`,
               borderRadius: borderRadius,
               backgroundImage: `url(${imageUrl})`,
               backgroundSize: `${gridSize.cols * 100}% ${gridSize.rows * 100}%`,
@@ -71,8 +75,8 @@ const PuzzleBoard: React.FC<PuzzleBoardProps> = ({
           >
             {/* Number Overlay */}
             {showNumbers && (
-              <div className="absolute top-1.5 left-1.5 bg-black/50 backdrop-blur-md rounded-lg px-2 py-0.5 min-w-[1.4rem] text-center border border-white/10">
-                <span className="text-[10px] font-black text-white/90">{val + 1}</span>
+              <div className="absolute top-1 left-1 bg-black/60 backdrop-blur-md rounded-md px-1.5 py-0.5 min-w-[1rem] text-center border border-white/5 pointer-events-none">
+                <span className="text-[9px] font-black text-white/80">{val + 1}</span>
               </div>
             )}
 
@@ -85,13 +89,13 @@ const PuzzleBoard: React.FC<PuzzleBoardProps> = ({
             
             {/* Moving indicator */}
             {isMoving && (
-              <div className="absolute inset-0 flex items-center justify-center bg-blue-400/30 border-2 border-blue-400">
+              <div className="absolute inset-0 flex items-center justify-center bg-blue-400/30 border-2 border-blue-400 pointer-events-none">
                 <div className="w-full h-full border-2 border-blue-400 animate-ping opacity-50" />
               </div>
             )}
 
-            {/* Hover overlay */}
-            <div className="absolute inset-0 bg-white/0 group-hover:bg-white/5 transition-colors" />
+            {/* Hover/Active highlight overlay */}
+            <div className="absolute inset-0 bg-white/0 group-hover:bg-white/5 active:bg-white/10 transition-colors pointer-events-none" />
           </div>
         );
       })}

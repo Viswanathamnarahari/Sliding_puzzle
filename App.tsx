@@ -29,6 +29,7 @@ const App: React.FC = () => {
   const [hasShuffled, setHasShuffled] = useState(false);
   
   const historyRef = useRef<number[][]>([]);
+  const shuffleDepthRef = useRef<number>(0);
   const timerRef = useRef<number | null>(null);
   const abortSolvingRef = useRef(false);
 
@@ -62,6 +63,7 @@ const App: React.FC = () => {
     setDistance(0);
     setHasShuffled(false);
     historyRef.current = [];
+    shuffleDepthRef.current = 0;
     setIsGameFinished(false);
     setClueTileIdx(null);
     setMovingTileIdx(null);
@@ -82,6 +84,7 @@ const App: React.FC = () => {
             setImageUrl(parsed.imageUrl);
             setGridSize(parsed.gridSize);
             historyRef.current = parsed.history || [];
+            shuffleDepthRef.current = parsed.shuffleDepth || 0;
             setDifficulty(parsed.difficulty || 'Medium');
             setSpacing(parsed.spacing || 2);
             setShowNumbers(parsed.showNumbers ?? true);
@@ -114,8 +117,8 @@ const App: React.FC = () => {
     if (board.length > 0) {
       const stateToSave = { 
         board, moves, requiredMoves, seconds, imageUrl, gridSize, 
-        history: historyRef.current, difficulty, spacing, 
-        showNumbers, tileShape, hasShuffled 
+        history: historyRef.current, shuffleDepth: shuffleDepthRef.current,
+        difficulty, spacing, showNumbers, tileShape, hasShuffled 
       };
       try {
         localStorage.setItem('puzzle_current_state', JSON.stringify(stateToSave));
@@ -202,6 +205,8 @@ const App: React.FC = () => {
       [curr[emptyIdx], curr[move]] = [curr[move], curr[emptyIdx]];
       lastEmpty = emptyIdx;
     }
+    
+    shuffleDepthRef.current = historyRef.current.length;
     setBoard(curr);
     setMoves(0);
     setRequiredMoves(shuffleCount);
@@ -211,7 +216,7 @@ const App: React.FC = () => {
   };
 
   const undo = () => {
-    if (isSolving || historyRef.current.length === 0) return;
+    if (isSolving || historyRef.current.length <= shuffleDepthRef.current) return;
     const last = historyRef.current.pop();
     if (last) {
       setBoard(last);
@@ -309,85 +314,85 @@ const App: React.FC = () => {
     e.target.value = '';
   };
 
+  const canUndo = !isSolving && historyRef.current.length > shuffleDepthRef.current;
+
   return (
-    <div className="w-full h-full flex items-center justify-center p-4">
-      {/* THE MAIN TRAY CONSOLE */}
-      <div className="tray-container w-full max-w-[460px] flex flex-col p-8 gap-8 relative overflow-hidden">
-        
-        {/* Subtle Ambient Glow inside tray */}
-        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-blue-500/20 to-transparent blur-sm" />
-
-        {/* Menu Toggle (Locked to top-left) */}
-        <button 
-            onClick={() => setIsMenuOpen(true)}
-            className="absolute top-7 left-7 p-2.5 rounded-2xl bg-white/5 border border-white/5 hover:bg-white/10 hover:border-white/10 text-white/50 hover:text-white transition-all z-20 shadow-lg active:scale-90"
-        >
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>
-        </button>
-
-        {/* TRAY HEADER: Branding & Dashboard HUD */}
-        <div className="flex flex-col items-center">
-            <h1 className="text-3xl font-black text-white/95 tracking-tighter uppercase mb-6 flex items-center gap-2">
-                <span className="opacity-40">LUMINA</span> 
-                <span className="text-blue-500 drop-shadow-[0_0_8px_rgba(59,130,246,0.5)]">PUZZLE</span>
+    <div className="w-full h-full flex flex-col items-center justify-start overflow-y-auto overflow-x-hidden p-4 md:p-12">
+      
+      {/* HEADER SECTION */}
+      <div className="w-full max-w-[420px] mb-8 flex flex-col items-center">
+        <div className="flex items-center justify-between w-full mb-8">
+            <button 
+                onClick={() => setIsMenuOpen(true)}
+                className="p-3.5 rounded-2xl bg-white/5 border border-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition-all shadow-xl active:scale-90"
+                aria-label="Open Menu"
+            >
+                <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>
+            </button>
+            <h1 className="text-2xl font-black text-white/95 tracking-tighter uppercase flex items-center gap-2">
+                <span className="opacity-30">LUMINA</span> 
+                <span className="text-blue-500 drop-shadow-[0_0_12px_rgba(59,130,246,0.4)]">PUZZLE</span>
             </h1>
-            
-            <div className="grid grid-cols-5 w-full gap-3">
-                {[
-                    { label: 'Moves', val: moves, color: 'text-white' },
-                    { label: 'Target', val: requiredMoves || '--', color: 'text-emerald-400' },
-                    { label: 'Best', val: bestMoves || '--', color: 'text-blue-400' },
-                    { label: 'Dist', val: distance, color: 'text-white/50' },
-                    { label: 'Time', val: `${Math.floor(seconds/60)}:${(seconds%60).toString().padStart(2,'0')}`, color: 'text-white' }
-                ].map((stat, i) => (
-                    <div key={i} className="stat-card flex flex-col items-center justify-center p-3 rounded-2xl">
-                        <span className={`text-sm font-black leading-none mb-1.5 ${stat.color}`}>{stat.val}</span>
-                        <span className="text-[7px] uppercase font-extrabold text-slate-500 tracking-[0.15em]">{stat.label}</span>
-                    </div>
-                ))}
-            </div>
+            <div className="w-[50px]"></div>
         </div>
 
-        {/* TRAY WELL: The Recessed Playing Field */}
-        <div className="tray-well p-6 flex items-center justify-center shadow-inner">
-            <PuzzleBoard 
-              board={board} 
-              gridSize={gridSize} 
-              imageUrl={imageUrl} 
-              onTileClick={handleMove}
-              spacing={spacing}
-              movingTileIdx={movingTileIdx}
-              clueTileIdx={clueTileIdx}
-              showNumbers={showNumbers}
-              tileShape={tileShape}
-            />
+        {/* HUD DASHBOARD */}
+        <div className="grid grid-cols-5 w-full gap-2.5">
+            {[
+                { label: 'Moves', val: moves, color: 'text-white' },
+                { label: 'Target', val: requiredMoves || '--', color: 'text-emerald-400' },
+                { label: 'Best', val: bestMoves || '--', color: 'text-blue-400' },
+                { label: 'Dist', val: distance, color: 'text-white/40' },
+                { label: 'Time', val: `${Math.floor(seconds/60)}:${(seconds%60).toString().padStart(2,'0')}`, color: 'text-white' }
+            ].map((stat, i) => (
+                <div key={i} className="stat-card flex flex-col items-center justify-center py-2.5 px-1 rounded-2xl">
+                    <span className={`text-xs font-black leading-none mb-1.5 ${stat.color}`}>{stat.val}</span>
+                    <span className="text-[6px] uppercase font-black text-slate-500 tracking-[0.15em]">{stat.label}</span>
+                </div>
+            ))}
         </div>
+      </div>
 
-        {/* TRAY FOOTER: Control Interface */}
-        <div className="w-full">
-            <Controls 
-              onShuffle={shuffle}
-              onSolve={solve}
-              onClue={getClue}
-              onUndo={undo}
-              isSolving={isSolving}
-            />
-        </div>
+      {/* BOARD SECTION */}
+      <div className="flex items-center justify-center mb-10">
+          <PuzzleBoard 
+            board={board} 
+            gridSize={gridSize} 
+            imageUrl={imageUrl} 
+            onTileClick={handleMove}
+            spacing={spacing}
+            movingTileIdx={movingTileIdx}
+            clueTileIdx={clueTileIdx}
+            showNumbers={showNumbers}
+            tileShape={tileShape}
+          />
+      </div>
+
+      {/* CONTROLS SECTION */}
+      <div className="w-full max-w-[420px] pb-12">
+          <Controls 
+            onShuffle={shuffle}
+            onSolve={solve}
+            onClue={getClue}
+            onUndo={undo}
+            isSolving={isSolving}
+            canUndo={canUndo}
+          />
       </div>
 
       {/* Win Modal Overlay */}
       {isGameFinished && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-6">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/95 backdrop-blur-xl p-6">
             <div className="bg-slate-900 border border-slate-700/50 p-10 rounded-[3rem] shadow-2xl text-center w-full max-w-sm animate-pop relative overflow-hidden">
                 <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 via-indigo-500 to-blue-500" />
-                <div className="w-24 h-24 bg-blue-500/10 rounded-full flex items-center justify-center mx-auto mb-6 border border-blue-500/30">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg>
+                <div className="w-20 h-20 bg-blue-500/10 rounded-full flex items-center justify-center mx-auto mb-8 border border-blue-500/30">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg>
                 </div>
-                <h2 className="text-3xl font-black mb-3 text-white uppercase tracking-tighter">Mission Accomplished</h2>
-                <p className="text-slate-400 text-sm mb-8 font-medium">You navigated the grid in <span className="text-white font-bold">{moves}</span> moves.</p>
+                <h2 className="text-2xl font-black mb-3 text-white uppercase tracking-tighter">Mission Accomplished</h2>
+                <p className="text-slate-400 text-xs mb-10 font-medium">Completed in <span className="text-white font-bold">{moves}</span> moves.</p>
                 <div className="flex flex-col gap-3">
-                    <button onClick={() => shuffle()} className="w-full py-5 bg-blue-600 hover:bg-blue-500 rounded-3xl font-black text-xs tracking-[0.2em] transition-all shadow-[0_10px_20px_rgba(37,99,235,0.3)] active:scale-95 text-white">RESTART MATRIX</button>
-                    <button onClick={() => setIsGameFinished(false)} className="w-full py-5 bg-slate-800 hover:bg-slate-750 rounded-3xl font-bold text-xs text-slate-400 tracking-[0.2em] transition-all active:scale-95">CONTINUE VIEWING</button>
+                    <button onClick={() => shuffle()} className="w-full py-5 bg-blue-600 hover:bg-blue-500 rounded-2xl font-black text-[10px] tracking-[0.2em] transition-all shadow-xl active:scale-95 text-white">RESTART MATRIX</button>
+                    <button onClick={() => setIsGameFinished(false)} className="w-full py-5 bg-slate-800 hover:bg-slate-750 rounded-2xl font-bold text-[10px] text-slate-400 tracking-[0.2em] transition-all active:scale-95 uppercase">Dismiss</button>
                 </div>
             </div>
         </div>
