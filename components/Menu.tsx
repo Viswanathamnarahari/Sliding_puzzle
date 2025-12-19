@@ -1,5 +1,5 @@
 import React from 'react';
-import { GridSize, Difficulty, StatsEntry } from '../types';
+import { GridSize, Difficulty, StatsEntry, TileShape } from '../types';
 
 interface MenuProps {
   isOpen: boolean;
@@ -12,6 +12,8 @@ interface MenuProps {
   setSpacing: (v: number) => void;
   showNumbers: boolean;
   setShowNumbers: (v: boolean) => void;
+  tileShape: TileShape;
+  setTileShape: (s: TileShape) => void;
   imageHistory: string[];
   onSelectHistoryImage: (url: string) => void;
   onPickImage: (e: React.ChangeEvent<HTMLInputElement>) => void;
@@ -20,7 +22,8 @@ interface MenuProps {
 
 const Menu: React.FC<MenuProps> = ({
   isOpen, onClose, gridSize, setGridSize, difficulty, setDifficulty,
-  spacing, setSpacing, showNumbers, setShowNumbers, imageHistory, onSelectHistoryImage, onPickImage, onLoadSaved
+  spacing, setSpacing, showNumbers, setShowNumbers, tileShape, setTileShape,
+  imageHistory, onSelectHistoryImage, onPickImage, onLoadSaved
 }) => {
   if (!isOpen) return null;
 
@@ -44,16 +47,16 @@ const Menu: React.FC<MenuProps> = ({
                 onClick={() => { onLoadSaved(); onClose(); }}
                 className="w-full py-4 bg-blue-600/20 border border-blue-500/30 text-blue-400 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-blue-600/30 transition-all active:scale-95"
             >
-                Load Saved State
+                LOAD SAVED STATE
             </button>
         </section>
 
         {/* Pick Picture */}
         <section>
-            <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em] mb-3">Pick Picture</h3>
+            <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em] mb-3">PICK PICTURE</h3>
             <label className="flex flex-col items-center justify-center w-full h-20 bg-slate-800 border-2 border-slate-700 border-dashed rounded-2xl hover:bg-slate-750 transition-all cursor-pointer group mb-4 active:scale-95">
                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mb-2 text-slate-500 group-hover:text-blue-400"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-                <span className="text-xs text-slate-400 font-black group-hover:text-blue-400 tracking-tighter">UPLOAD FROM GALLERY</span>
+                <span className="text-xs text-slate-400 font-black group-hover:text-blue-400 tracking-tighter uppercase">Gallery Upload</span>
                 <input type="file" accept="image/*" onChange={(e) => { onPickImage(e); onClose(); }} className="hidden" />
             </label>
             {imageHistory.length > 0 && (
@@ -72,7 +75,7 @@ const Menu: React.FC<MenuProps> = ({
 
         {/* Toggles */}
         <section className="flex items-center justify-between p-4 bg-slate-800/50 rounded-2xl border border-white/5">
-            <span className="text-xs font-black text-slate-300 tracking-tight">SHOW NUMBERS</span>
+            <span className="text-xs font-black text-slate-300 tracking-tight uppercase">SHOW NUMBERS</span>
             <button 
                 onClick={() => setShowNumbers(!showNumbers)}
                 className={`relative w-12 h-6 rounded-full transition-colors ${showNumbers ? 'bg-blue-600' : 'bg-slate-700'}`}
@@ -81,9 +84,29 @@ const Menu: React.FC<MenuProps> = ({
             </button>
         </section>
 
+        {/* Tile Shape Selection */}
+        <section>
+            <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em] mb-3">TILE SHAPE</h3>
+            <div className="flex gap-2">
+                {(['square', 'rounded'] as TileShape[]).map(s => (
+                    <button 
+                        key={s} 
+                        onClick={() => setTileShape(s)}
+                        className={`flex-1 py-3 rounded-xl text-xs font-bold transition-all border uppercase tracking-widest ${
+                            tileShape === s 
+                            ? 'bg-blue-600 border-blue-400 text-white shadow-lg' 
+                            : 'bg-slate-800 border-white/5 text-slate-400'
+                        }`}
+                    >
+                        {s.toUpperCase()}
+                    </button>
+                ))}
+            </div>
+        </section>
+
         {/* Grid Selection */}
         <section>
-            <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em] mb-3">Select Grid</h3>
+            <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em] mb-3">SELECT GRID</h3>
             <div className="grid grid-cols-3 gap-2">
                 {[ {r:3, c:3}, {r:4, c:4}, {r:5, c:4} ].map((g, i) => (
                     <button 
@@ -103,13 +126,13 @@ const Menu: React.FC<MenuProps> = ({
 
         {/* Difficulty Setting */}
         <section>
-            <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em] mb-3">Difficulty</h3>
+            <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em] mb-3">DIFFICULTY</h3>
             <div className="flex gap-2">
                 {(['Easy', 'Medium', 'Hard'] as Difficulty[]).map(d => (
                     <button 
                         key={d} 
                         onClick={() => setDifficulty(d)}
-                        className={`flex-1 py-3 rounded-xl text-xs font-bold transition-all border ${
+                        className={`flex-1 py-3 rounded-xl text-xs font-bold transition-all border uppercase tracking-widest ${
                             difficulty === d 
                             ? 'bg-indigo-600 border-indigo-400 text-white shadow-lg' 
                             : 'bg-slate-800 border-white/5 text-slate-400'
@@ -124,7 +147,7 @@ const Menu: React.FC<MenuProps> = ({
         {/* Spacing Setting */}
         <section>
             <div className="flex justify-between items-center mb-2">
-                <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">Tile Spacing</h3>
+                <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">TILE SPACING</h3>
                 <span className="text-xs font-bold text-blue-400">{spacing}px</span>
             </div>
             <input 
@@ -136,7 +159,7 @@ const Menu: React.FC<MenuProps> = ({
 
         {/* Stats Display */}
         <section className="mt-auto border-t border-white/5 pt-6 pb-4">
-            <h3 className="text-[10px] font-bold text-blue-400 uppercase tracking-[0.2em] mb-4">Hall of Fame (Best 10)</h3>
+            <h3 className="text-[10px] font-bold text-blue-400 uppercase tracking-[0.2em] mb-4">HALL OF FAME</h3>
             <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
                 {bestStats.length === 0 ? (
                     <p className="text-[10px] text-slate-600 italic text-center py-4">No records yet. Win a game to show up here!</p>
@@ -144,12 +167,12 @@ const Menu: React.FC<MenuProps> = ({
                     bestStats.map((s, i) => (
                         <div key={i} className="flex justify-between items-center bg-slate-800/40 p-3 rounded-xl text-[10px] border border-white/5">
                             <div className="flex flex-col">
-                                <span className="font-bold text-slate-300 uppercase">{s.gridSize} Grid</span>
-                                <span className="text-slate-600">{s.date}</span>
+                                <span className="font-bold text-slate-300 uppercase">{s.gridSize} GRID</span>
+                                <span className="text-slate-600 uppercase">{s.date}</span>
                             </div>
                             <div className="text-right">
-                                <div className="text-blue-400 font-black">{s.moves} moves</div>
-                                <div className="text-slate-500">{s.time}s</div>
+                                <div className="text-blue-400 font-black uppercase">{s.moves} MOVES</div>
+                                <div className="text-slate-500 uppercase">{s.time}S</div>
                             </div>
                         </div>
                     ))

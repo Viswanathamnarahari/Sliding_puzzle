@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { GridSize, Difficulty, StatsEntry } from './types';
+import { GridSize, Difficulty, StatsEntry, TileShape } from './types';
 import { isAdjacent, getMovableIndices, isSolved, getManhattanDistance } from './services/puzzleLogic';
 import PuzzleBoard from './components/PuzzleBoard';
 import Controls from './components/Controls';
@@ -18,6 +18,7 @@ const App: React.FC = () => {
   const [difficulty, setDifficulty] = useState<Difficulty>('Medium');
   const [spacing, setSpacing] = useState(2);
   const [showNumbers, setShowNumbers] = useState(true);
+  const [tileShape, setTileShape] = useState<TileShape>('square');
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isSolving, setIsSolving] = useState(false);
   const [movingTileIdx, setMovingTileIdx] = useState<number | null>(null);
@@ -31,7 +32,6 @@ const App: React.FC = () => {
   const timerRef = useRef<number | null>(null);
   const abortSolvingRef = useRef(false);
 
-  // Sync personal best moves from local storage
   const updateBestMoves = useCallback(() => {
     try {
       const rawStats = localStorage.getItem('puzzle_stats');
@@ -53,7 +53,6 @@ const App: React.FC = () => {
     }
   }, [gridSize]);
 
-  // Reset or initialize a new game board
   const initBoard = useCallback((size: GridSize) => {
     const newBoard = Array.from({ length: size.rows * size.cols }, (_, i) => i);
     setBoard(newBoard);
@@ -71,7 +70,6 @@ const App: React.FC = () => {
     updateBestMoves();
   }, [updateBestMoves]);
 
-  // Load existing session from storage
   const loadSavedState = useCallback(() => {
     const lastState = localStorage.getItem('puzzle_current_state');
     if (lastState) {
@@ -87,6 +85,7 @@ const App: React.FC = () => {
             setDifficulty(parsed.difficulty || 'Medium');
             setSpacing(parsed.spacing || 2);
             setShowNumbers(parsed.showNumbers ?? true);
+            setTileShape(parsed.tileShape || 'square');
             setHasShuffled(parsed.hasShuffled ?? false);
             setDistance(getManhattanDistance(parsed.board, parsed.gridSize));
             setIsGameFinished(isSolved(parsed.board) && parsed.hasShuffled && parsed.moves > 0);
@@ -99,7 +98,6 @@ const App: React.FC = () => {
     updateBestMoves();
   }, [gridSize, initBoard, updateBestMoves]);
 
-  // Mount effects
   useEffect(() => {
     const storedHistory = localStorage.getItem('puzzle_image_history');
     if (storedHistory) {
@@ -112,13 +110,12 @@ const App: React.FC = () => {
     loadSavedState();
   }, []);
 
-  // Persist state on every change
   useEffect(() => {
     if (board.length > 0) {
       const stateToSave = { 
         board, moves, requiredMoves, seconds, imageUrl, gridSize, 
         history: historyRef.current, difficulty, spacing, 
-        showNumbers, hasShuffled 
+        showNumbers, tileShape, hasShuffled 
       };
       try {
         localStorage.setItem('puzzle_current_state', JSON.stringify(stateToSave));
@@ -127,11 +124,11 @@ const App: React.FC = () => {
       }
     }
     setDistance(getManhattanDistance(board, gridSize));
-  }, [board, moves, requiredMoves, seconds, imageUrl, gridSize, difficulty, spacing, showNumbers, hasShuffled]);
+  }, [board, moves, requiredMoves, seconds, imageUrl, gridSize, difficulty, spacing, showNumbers, tileShape, hasShuffled]);
 
-  // Game timer
+  const isTimerActive = moves > 0 && !isGameFinished && !isSolving;
   useEffect(() => {
-    if (moves > 0 && !isGameFinished && !isSolving) {
+    if (isTimerActive) {
       if (!timerRef.current) {
         timerRef.current = window.setInterval(() => setSeconds(s => s + 1), 1000);
       }
@@ -141,8 +138,8 @@ const App: React.FC = () => {
         timerRef.current = null;
       }
     }
-    return () => { if (timerRef.current) clearInterval(timerRef.current); };
-  }, [moves, isGameFinished, isSolving]);
+    return () => {};
+  }, [isTimerActive]);
 
   const saveStats = useCallback((m: number, t: number, s: GridSize) => {
     const stats: StatsEntry[] = JSON.parse(localStorage.getItem('puzzle_stats') || '[]');
@@ -157,7 +154,6 @@ const App: React.FC = () => {
     updateBestMoves();
   }, [updateBestMoves]);
 
-  // Main move logic with history pruning for perfect "Clue" logic
   const handleMove = (index: number, silent = false) => {
     if (isSolving && !silent) return;
     const emptyIdx = board.indexOf(board.length - 1);
@@ -167,9 +163,6 @@ const App: React.FC = () => {
       const nextBoard = [...board];
       [nextBoard[index], nextBoard[emptyIdx]] = [nextBoard[emptyIdx], nextBoard[index]];
       
-      // Smart History Tracking: 
-      // If moving to a state we just came from, pop from history (backtracking).
-      // Otherwise, add current state to history to track the path.
       const previousState = historyRef.current[historyRef.current.length - 1];
       const isCorrectBacktrack = previousState && previousState.every((val, i) => val === nextBoard[i]);
 
@@ -193,14 +186,13 @@ const App: React.FC = () => {
     }
   };
 
-  // Generate a valid solvable shuffle
   const shuffle = () => {
     if (isSolving) return;
     setIsGameFinished(false);
     let curr = Array.from({ length: gridSize.rows * gridSize.cols }, (_, i) => i);
     const shuffleCount = difficulty === 'Easy' ? 20 : difficulty === 'Medium' ? 50 : 150;
     let lastEmpty = -1;
-    historyRef.current = []; // Clear history for new path
+    historyRef.current = [];
 
     for (let i = 0; i < shuffleCount; i++) {
       const emptyIdx = curr.indexOf(curr.length - 1);
@@ -229,20 +221,13 @@ const App: React.FC = () => {
     }
   };
 
-  // High-certainty clue based on current shortest path (historyRef)
   const getClue = () => {
     if (isSolving || isGameFinished || !hasShuffled || historyRef.current.length === 0) return;
-    
-    // Look at the state we need to return to
     const previousState = historyRef.current[historyRef.current.length - 1];
-    // Find where the empty tile was in that previous state
     const emptyIdxInPrevious = previousState.indexOf(board.length - 1);
-    
-    // The tile currently at that position in the CURRENT board is the correct move
     setClueTileIdx(emptyIdxInPrevious);
   };
 
-  // Auto-solve by following history back to start
   const solve = async () => {
     if (isSolving) {
       abortSolvingRef.current = true;
@@ -253,24 +238,26 @@ const App: React.FC = () => {
     setIsSolving(true);
     abortSolvingRef.current = false;
     
+    let moveCounter = moves;
     while (historyRef.current.length > 0 && !abortSolvingRef.current) {
       const previousState = historyRef.current[historyRef.current.length - 1];
       const emptyIdxInPrevious = previousState.indexOf(board.length - 1);
       
       setMovingTileIdx(emptyIdxInPrevious);
-      await new Promise(r => setTimeout(r, 1000));
+      await new Promise(r => setTimeout(r, 600));
       
       if (abortSolvingRef.current) break;
       
       const nextBoard = [...previousState];
       setBoard(nextBoard);
-      historyRef.current.pop(); // Pop as we move back
-      setMoves(m => m + 1);
+      historyRef.current.pop();
+      moveCounter++;
+      setMoves(moveCounter);
       setMovingTileIdx(null);
       
       if (isSolved(nextBoard)) {
           setIsGameFinished(true);
-          saveStats(moves + 1, seconds, gridSize);
+          saveStats(moveCounter, seconds, gridSize);
           break;
       }
     }
@@ -307,7 +294,7 @@ const App: React.FC = () => {
               try {
                 const dataUrl = canvas.toDataURL('image/jpeg', 0.6);
                 setImageUrl(dataUrl);
-                const updated = [dataUrl, ...imageHistory.filter(x => x !== dataUrl)].slice(0, 3);
+                const updated = [dataUrl, ...imageHistory.filter(x => x !== dataUrl)].slice(0, 5);
                 setImageHistory(updated);
                 localStorage.setItem('puzzle_image_history', JSON.stringify(updated));
               } catch (err) {
@@ -323,90 +310,90 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col items-center justify-between h-full w-full py-2 px-4 bg-slate-950 overflow-hidden relative">
-      <button 
-        onClick={() => setIsMenuOpen(true)}
-        className="absolute top-4 left-4 p-3 rounded-full bg-slate-800 hover:bg-slate-700 transition-colors z-40 shadow-lg"
-      >
-        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>
-      </button>
+    <div className="w-full h-full flex items-center justify-center p-4">
+      {/* THE MAIN TRAY CONSOLE */}
+      <div className="tray-container w-full max-w-[460px] flex flex-col p-8 gap-8 relative overflow-hidden">
+        
+        {/* Subtle Ambient Glow inside tray */}
+        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-blue-500/20 to-transparent blur-sm" />
 
-      <div className="text-center mt-2 flex flex-col items-center">
-        <h1 className="text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-indigo-500 tracking-tighter mb-1 uppercase">Puzzle Master</h1>
-        <div className="flex gap-4 text-[9px] font-bold text-slate-400 uppercase tracking-widest justify-center">
-            <div className="flex flex-col items-center px-1">
-                <span className="text-white text-base leading-none mb-1">{moves}</span>
-                <span>Moves</span>
+        {/* Menu Toggle (Locked to top-left) */}
+        <button 
+            onClick={() => setIsMenuOpen(true)}
+            className="absolute top-7 left-7 p-2.5 rounded-2xl bg-white/5 border border-white/5 hover:bg-white/10 hover:border-white/10 text-white/50 hover:text-white transition-all z-20 shadow-lg active:scale-90"
+        >
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>
+        </button>
+
+        {/* TRAY HEADER: Branding & Dashboard HUD */}
+        <div className="flex flex-col items-center">
+            <h1 className="text-3xl font-black text-white/95 tracking-tighter uppercase mb-6 flex items-center gap-2">
+                <span className="opacity-40">LUMINA</span> 
+                <span className="text-blue-500 drop-shadow-[0_0_8px_rgba(59,130,246,0.5)]">PUZZLE</span>
+            </h1>
+            
+            <div className="grid grid-cols-5 w-full gap-3">
+                {[
+                    { label: 'Moves', val: moves, color: 'text-white' },
+                    { label: 'Target', val: requiredMoves || '--', color: 'text-emerald-400' },
+                    { label: 'Best', val: bestMoves || '--', color: 'text-blue-400' },
+                    { label: 'Dist', val: distance, color: 'text-white/50' },
+                    { label: 'Time', val: `${Math.floor(seconds/60)}:${(seconds%60).toString().padStart(2,'0')}`, color: 'text-white' }
+                ].map((stat, i) => (
+                    <div key={i} className="stat-card flex flex-col items-center justify-center p-3 rounded-2xl">
+                        <span className={`text-sm font-black leading-none mb-1.5 ${stat.color}`}>{stat.val}</span>
+                        <span className="text-[7px] uppercase font-extrabold text-slate-500 tracking-[0.15em]">{stat.label}</span>
+                    </div>
+                ))}
             </div>
-            <div className="flex flex-col items-center px-1">
-                <span className="text-emerald-400 text-base leading-none mb-1 font-black">{requiredMoves > 0 ? requiredMoves : '--'}</span>
-                <span>Target</span>
-            </div>
-            <div className="flex flex-col items-center px-1">
-                <span className="text-blue-400 text-base leading-none mb-1 font-black">{bestMoves !== null ? bestMoves : '--'}</span>
-                <span>Best</span>
-            </div>
-            <div className="flex flex-col items-center px-1">
-                <span className="text-white text-base leading-none mb-1">{distance}</span>
-                <span>Distance</span>
-            </div>
-            <div className="flex flex-col items-center px-1">
-                <span className="text-white text-base leading-none mb-1">{Math.floor(seconds/60)}:{(seconds%60).toString().padStart(2,'0')}</span>
-                <span>Time</span>
-            </div>
+        </div>
+
+        {/* TRAY WELL: The Recessed Playing Field */}
+        <div className="tray-well p-6 flex items-center justify-center shadow-inner">
+            <PuzzleBoard 
+              board={board} 
+              gridSize={gridSize} 
+              imageUrl={imageUrl} 
+              onTileClick={handleMove}
+              spacing={spacing}
+              movingTileIdx={movingTileIdx}
+              clueTileIdx={clueTileIdx}
+              showNumbers={showNumbers}
+              tileShape={tileShape}
+            />
+        </div>
+
+        {/* TRAY FOOTER: Control Interface */}
+        <div className="w-full">
+            <Controls 
+              onShuffle={shuffle}
+              onSolve={solve}
+              onClue={getClue}
+              onUndo={undo}
+              isSolving={isSolving}
+            />
         </div>
       </div>
 
-      <div className="flex-1 flex items-center justify-center w-full min-h-0 py-2">
-        <PuzzleBoard 
-          board={board} 
-          gridSize={gridSize} 
-          imageUrl={imageUrl} 
-          onTileClick={handleMove}
-          spacing={spacing}
-          movingTileIdx={movingTileIdx}
-          clueTileIdx={clueTileIdx}
-          showNumbers={showNumbers}
-        />
-      </div>
-
-      <div className="w-full max-w-sm mb-4 px-2">
-        <Controls 
-          onShuffle={shuffle}
-          onSolve={solve}
-          onClue={getClue}
-          onUndo={undo}
-          isSolving={isSolving}
-        />
-      </div>
-
+      {/* Win Modal Overlay */}
       {isGameFinished && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-6">
-            <div className="bg-slate-900 border border-slate-700 p-8 rounded-3xl shadow-2xl text-center w-full max-w-xs animate-menu">
-                <div className="w-20 h-20 bg-blue-500/20 rounded-full flex items-center justify-center mx-auto mb-4 border border-blue-500/50">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-6">
+            <div className="bg-slate-900 border border-slate-700/50 p-10 rounded-[3rem] shadow-2xl text-center w-full max-w-sm animate-pop relative overflow-hidden">
+                <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 via-indigo-500 to-blue-500" />
+                <div className="w-24 h-24 bg-blue-500/10 rounded-full flex items-center justify-center mx-auto mb-6 border border-blue-500/30">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg>
                 </div>
-                <h2 className="text-2xl font-black mb-2 text-white uppercase tracking-tighter">Solved!</h2>
-                <p className="text-slate-400 text-sm mb-2">Excellent work! You finished in {moves} moves.</p>
-                <p className="text-blue-400 text-xs font-bold mb-6 uppercase tracking-widest">Do you want to play again?</p>
+                <h2 className="text-3xl font-black mb-3 text-white uppercase tracking-tighter">Mission Accomplished</h2>
+                <p className="text-slate-400 text-sm mb-8 font-medium">You navigated the grid in <span className="text-white font-bold">{moves}</span> moves.</p>
                 <div className="flex flex-col gap-3">
-                    <button 
-                        onClick={() => { shuffle(); }}
-                        className="w-full py-4 bg-blue-600 hover:bg-blue-500 rounded-2xl font-black text-sm tracking-widest transition-all shadow-lg active:scale-95"
-                    >
-                        PLAY AGAIN
-                    </button>
-                    <button 
-                        onClick={() => setIsGameFinished(false)}
-                        className="w-full py-4 bg-slate-800 hover:bg-slate-700 rounded-2xl font-bold text-sm text-slate-300 tracking-widest transition-all active:scale-95"
-                    >
-                        CLOSE
-                    </button>
+                    <button onClick={() => shuffle()} className="w-full py-5 bg-blue-600 hover:bg-blue-500 rounded-3xl font-black text-xs tracking-[0.2em] transition-all shadow-[0_10px_20px_rgba(37,99,235,0.3)] active:scale-95 text-white">RESTART MATRIX</button>
+                    <button onClick={() => setIsGameFinished(false)} className="w-full py-5 bg-slate-800 hover:bg-slate-750 rounded-3xl font-bold text-xs text-slate-400 tracking-[0.2em] transition-all active:scale-95">CONTINUE VIEWING</button>
                 </div>
             </div>
         </div>
       )}
 
+      {/* Menu Sidebar */}
       <Menu 
         isOpen={isMenuOpen}
         onClose={() => setIsMenuOpen(false)}
@@ -418,6 +405,8 @@ const App: React.FC = () => {
         setSpacing={setSpacing}
         showNumbers={showNumbers}
         setShowNumbers={setShowNumbers}
+        tileShape={tileShape}
+        setTileShape={setTileShape}
         imageHistory={imageHistory}
         onSelectHistoryImage={setImageUrl}
         onPickImage={pickImage}
