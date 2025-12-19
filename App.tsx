@@ -31,6 +31,7 @@ const App: React.FC = () => {
   const timerRef = useRef<number | null>(null);
   const abortSolvingRef = useRef(false);
 
+  // Sync personal best moves from local storage
   const updateBestMoves = useCallback(() => {
     try {
       const rawStats = localStorage.getItem('puzzle_stats');
@@ -52,6 +53,7 @@ const App: React.FC = () => {
     }
   }, [gridSize]);
 
+  // Reset or initialize a new game board
   const initBoard = useCallback((size: GridSize) => {
     const newBoard = Array.from({ length: size.rows * size.cols }, (_, i) => i);
     setBoard(newBoard);
@@ -69,6 +71,7 @@ const App: React.FC = () => {
     updateBestMoves();
   }, [updateBestMoves]);
 
+  // Load existing session from storage
   const loadSavedState = useCallback(() => {
     const lastState = localStorage.getItem('puzzle_current_state');
     if (lastState) {
@@ -96,6 +99,7 @@ const App: React.FC = () => {
     updateBestMoves();
   }, [gridSize, initBoard, updateBestMoves]);
 
+  // Mount effects
   useEffect(() => {
     const storedHistory = localStorage.getItem('puzzle_image_history');
     if (storedHistory) {
@@ -108,6 +112,7 @@ const App: React.FC = () => {
     loadSavedState();
   }, []);
 
+  // Persist state on every change
   useEffect(() => {
     if (board.length > 0) {
       const stateToSave = { 
@@ -124,6 +129,7 @@ const App: React.FC = () => {
     setDistance(getManhattanDistance(board, gridSize));
   }, [board, moves, requiredMoves, seconds, imageUrl, gridSize, difficulty, spacing, showNumbers, hasShuffled]);
 
+  // Game timer
   useEffect(() => {
     if (moves > 0 && !isGameFinished && !isSolving) {
       if (!timerRef.current) {
@@ -151,6 +157,7 @@ const App: React.FC = () => {
     updateBestMoves();
   }, [updateBestMoves]);
 
+  // Main move logic with history pruning for perfect "Clue" logic
   const handleMove = (index: number, silent = false) => {
     if (isSolving && !silent) return;
     const emptyIdx = board.indexOf(board.length - 1);
@@ -160,11 +167,13 @@ const App: React.FC = () => {
       const nextBoard = [...board];
       [nextBoard[index], nextBoard[emptyIdx]] = [nextBoard[emptyIdx], nextBoard[index]];
       
-      // Determine if this move is backtracking along the known path
+      // Smart History Tracking: 
+      // If moving to a state we just came from, pop from history (backtracking).
+      // Otherwise, add current state to history to track the path.
       const previousState = historyRef.current[historyRef.current.length - 1];
-      const isBacktracking = previousState && previousState.every((val, i) => val === nextBoard[i]);
+      const isCorrectBacktrack = previousState && previousState.every((val, i) => val === nextBoard[i]);
 
-      if (isBacktracking) {
+      if (isCorrectBacktrack) {
         historyRef.current.pop();
       } else {
         historyRef.current.push(currentBoard);
@@ -184,13 +193,14 @@ const App: React.FC = () => {
     }
   };
 
+  // Generate a valid solvable shuffle
   const shuffle = () => {
     if (isSolving) return;
     setIsGameFinished(false);
     let curr = Array.from({ length: gridSize.rows * gridSize.cols }, (_, i) => i);
     const shuffleCount = difficulty === 'Easy' ? 20 : difficulty === 'Medium' ? 50 : 150;
     let lastEmpty = -1;
-    historyRef.current = [];
+    historyRef.current = []; // Clear history for new path
 
     for (let i = 0; i < shuffleCount; i++) {
       const emptyIdx = curr.indexOf(curr.length - 1);
@@ -213,23 +223,26 @@ const App: React.FC = () => {
     const last = historyRef.current.pop();
     if (last) {
       setBoard(last);
-      setMoves(m => m + 1); // Undo is still a move action
+      setMoves(m => m + 1);
       setClueTileIdx(null);
       setIsGameFinished(false);
     }
   };
 
+  // High-certainty clue based on current shortest path (historyRef)
   const getClue = () => {
     if (isSolving || isGameFinished || !hasShuffled || historyRef.current.length === 0) return;
     
-    // Suggest the move that leads back to the previous state in our history
+    // Look at the state we need to return to
     const previousState = historyRef.current[historyRef.current.length - 1];
+    // Find where the empty tile was in that previous state
     const emptyIdxInPrevious = previousState.indexOf(board.length - 1);
     
-    // The tile currently at the 'old' empty index is the one that needs to move
+    // The tile currently at that position in the CURRENT board is the correct move
     setClueTileIdx(emptyIdxInPrevious);
   };
 
+  // Auto-solve by following history back to start
   const solve = async () => {
     if (isSolving) {
       abortSolvingRef.current = true;
@@ -251,7 +264,7 @@ const App: React.FC = () => {
       
       const nextBoard = [...previousState];
       setBoard(nextBoard);
-      historyRef.current.pop();
+      historyRef.current.pop(); // Pop as we move back
       setMoves(m => m + 1);
       setMovingTileIdx(null);
       
@@ -357,7 +370,7 @@ const App: React.FC = () => {
         />
       </div>
 
-      <div className="w-full max-sm mb-4">
+      <div className="w-full max-w-sm mb-4 px-2">
         <Controls 
           onShuffle={shuffle}
           onSolve={solve}
