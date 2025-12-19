@@ -30,7 +30,12 @@ const App: React.FC = () => {
   const abortSolvingRef = useRef(false);
 
   const updateBestMoves = useCallback(() => {
-    const stats: StatsEntry[] = JSON.parse(localStorage.getItem('puzzle_stats') || '[]');
+    const rawStats = localStorage.getItem('puzzle_stats');
+    if (!rawStats) {
+      setBestMoves(null);
+      return;
+    }
+    const stats: StatsEntry[] = JSON.parse(rawStats);
     const relevant = stats.filter(s => s.gridSize === `${gridSize.rows}x${gridSize.cols}`);
     if (relevant.length > 0) {
       const min = Math.min(...relevant.map(r => r.moves));
@@ -70,6 +75,7 @@ const App: React.FC = () => {
             setSpacing(parsed.spacing || 2);
             setShowNumbers(parsed.showNumbers ?? true);
             setDistance(getManhattanDistance(parsed.board, parsed.gridSize));
+            // Only show finished if moves > 0 and solved
             setIsGameFinished(isSolved(parsed.board) && parsed.moves > 0);
         } catch(e) {
             initBoard(gridSize);
@@ -116,19 +122,27 @@ const App: React.FC = () => {
       const newBoard = [...board];
       [newBoard[index], newBoard[emptyIdx]] = [newBoard[emptyIdx], newBoard[index]];
       setBoard(newBoard);
-      if (!silent) setMoves(m => m + 1);
-      setClueTileIdx(null);
-
-      if (!silent && isSolved(newBoard)) {
-        setIsGameFinished(true);
-        saveStats(moves + 1, seconds, gridSize);
+      
+      if (!silent) {
+        const nextMoves = moves + 1;
+        setMoves(nextMoves);
+        setClueTileIdx(null);
+        if (isSolved(newBoard)) {
+          setIsGameFinished(true);
+          saveStats(nextMoves, seconds, gridSize);
+        }
       }
     }
   };
 
   const saveStats = (m: number, t: number, s: GridSize) => {
     const stats: StatsEntry[] = JSON.parse(localStorage.getItem('puzzle_stats') || '[]');
-    const entry: StatsEntry = { date: new Date().toLocaleDateString(), moves: m, time: t, gridSize: `${s.rows}x${s.cols}` };
+    const entry: StatsEntry = { 
+      date: new Date().toLocaleDateString(), 
+      moves: m, 
+      time: t, 
+      gridSize: `${s.rows}x${s.cols}` 
+    };
     const updated = [entry, ...stats].sort((a,b) => a.moves - b.moves).slice(0, 50);
     localStorage.setItem('puzzle_stats', JSON.stringify(updated));
     updateBestMoves();
@@ -136,6 +150,7 @@ const App: React.FC = () => {
 
   const shuffle = () => {
     if (isSolving) return;
+    setIsGameFinished(false);
     let curr = Array.from({ length: gridSize.rows * gridSize.cols }, (_, i) => i);
     const shuffleCount = difficulty === 'Easy' ? 20 : difficulty === 'Medium' ? 50 : 150;
     let lastEmpty = -1;
@@ -152,7 +167,6 @@ const App: React.FC = () => {
     setBoard(curr);
     setMoves(0);
     setSeconds(0);
-    setIsGameFinished(false);
     setClueTileIdx(null);
   };
 
@@ -171,7 +185,6 @@ const App: React.FC = () => {
     const emptyIdx = board.indexOf(board.length - 1);
     const movables = getMovableIndices(emptyIdx, gridSize);
     
-    // Smart clue: find the move that reduces Manhattan distance the most
     let bestIdx = movables[0];
     let minDistance = Infinity;
     
@@ -225,10 +238,10 @@ const App: React.FC = () => {
       const reader = new FileReader();
       reader.onload = (ev) => {
         const img = new Image();
+        img.crossOrigin = "anonymous";
         img.onload = () => {
-            // Resize image to max 1024px to prevent "blank screen" crash on some mobile devices
             const canvas = document.createElement('canvas');
-            const MAX_SIZE = 1024;
+            const MAX_SIZE = 1280;
             let width = img.width;
             let height = img.height;
             if (width > height) {
@@ -245,13 +258,18 @@ const App: React.FC = () => {
             canvas.width = width;
             canvas.height = height;
             const ctx = canvas.getContext('2d');
-            ctx?.drawImage(img, 0, 0, width, height);
-            const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
-            
-            setImageUrl(dataUrl);
-            const updated = [dataUrl, ...imageHistory.filter(x => x !== dataUrl)].slice(0, 10);
-            setImageHistory(updated);
-            localStorage.setItem('puzzle_image_history', JSON.stringify(updated));
+            if (ctx) {
+              ctx.drawImage(img, 0, 0, width, height);
+              try {
+                const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+                setImageUrl(dataUrl);
+                const updated = [dataUrl, ...imageHistory.filter(x => x !== dataUrl)].slice(0, 10);
+                setImageHistory(updated);
+                localStorage.setItem('puzzle_image_history', JSON.stringify(updated));
+              } catch (err) {
+                console.error("Canvas toDataURL failed:", err);
+              }
+            }
         };
         img.src = ev.target?.result as string;
       };
@@ -276,7 +294,7 @@ const App: React.FC = () => {
                 <span>Moves</span>
             </div>
             <div className="flex flex-col items-center">
-                <span className="text-blue-400 text-base leading-none mb-1">{bestMoves ?? '--'}</span>
+                <span className="text-blue-400 text-base leading-none mb-1 font-black">{bestMoves ?? '--'}</span>
                 <span>Best</span>
             </div>
             <div className="flex flex-col items-center">
@@ -320,10 +338,10 @@ const App: React.FC = () => {
                     <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg>
                 </div>
                 <h2 className="text-2xl font-black mb-2 text-white uppercase tracking-tighter">Solved!</h2>
-                <p className="text-slate-400 text-sm mb-6">Excellent work. Would you like to play another round?</p>
+                <p className="text-slate-400 text-sm mb-4">You solved it in {moves} moves!</p>
                 <div className="flex flex-col gap-3">
                     <button 
-                        onClick={() => { initBoard(gridSize); shuffle(); }}
+                        onClick={() => { shuffle(); }}
                         className="w-full py-4 bg-blue-600 hover:bg-blue-500 rounded-2xl font-black text-sm tracking-widest transition-all shadow-lg active:scale-95"
                     >
                         RESTART PUZZLE
