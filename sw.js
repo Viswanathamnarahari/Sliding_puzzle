@@ -1,8 +1,7 @@
-
 const CACHE_NAME = 'lumina-puzzle-v1';
 const ASSETS = [
-  './',
-  './index.html',
+  '/',
+  '/index.html',
   'https://cdn.tailwindcss.com',
   'https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap'
 ];
