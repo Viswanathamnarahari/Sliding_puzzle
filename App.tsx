@@ -16,16 +16,29 @@ const App: React.FC = () => {
   const [imageUrl, setImageUrl] = useState(DEFAULT_IMAGE);
   const [difficulty, setDifficulty] = useState<Difficulty>('Medium');
   const [spacing, setSpacing] = useState(2);
+  const [showNumbers, setShowNumbers] = useState(true);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isSolving, setIsSolving] = useState(false);
   const [movingTileIdx, setMovingTileIdx] = useState<number | null>(null);
   const [clueTileIdx, setClueTileIdx] = useState<number | null>(null);
   const [isGameFinished, setIsGameFinished] = useState(false);
   const [imageHistory, setImageHistory] = useState<string[]>([]);
+  const [bestMoves, setBestMoves] = useState<number | null>(null);
   
   const historyRef = useRef<number[][]>([]);
   const timerRef = useRef<number | null>(null);
   const abortSolvingRef = useRef(false);
+
+  const updateBestMoves = useCallback(() => {
+    const stats: StatsEntry[] = JSON.parse(localStorage.getItem('puzzle_stats') || '[]');
+    const relevant = stats.filter(s => s.gridSize === `${gridSize.rows}x${gridSize.cols}`);
+    if (relevant.length > 0) {
+      const min = Math.min(...relevant.map(r => r.moves));
+      setBestMoves(min);
+    } else {
+      setBestMoves(null);
+    }
+  }, [gridSize]);
 
   const initBoard = useCallback((size: GridSize) => {
     const newBoard = Array.from({ length: size.rows * size.cols }, (_, i) => i);
@@ -39,7 +52,8 @@ const App: React.FC = () => {
     setMovingTileIdx(null);
     setIsSolving(false);
     abortSolvingRef.current = false;
-  }, []);
+    updateBestMoves();
+  }, [updateBestMoves]);
 
   const loadSavedState = useCallback(() => {
     const lastState = localStorage.getItem('puzzle_current_state');
@@ -54,6 +68,7 @@ const App: React.FC = () => {
             historyRef.current = parsed.history || [];
             setDifficulty(parsed.difficulty || 'Medium');
             setSpacing(parsed.spacing || 2);
+            setShowNumbers(parsed.showNumbers ?? true);
             setDistance(getManhattanDistance(parsed.board, parsed.gridSize));
             setIsGameFinished(isSolved(parsed.board) && parsed.moves > 0);
         } catch(e) {
@@ -62,7 +77,8 @@ const App: React.FC = () => {
     } else {
         initBoard(gridSize);
     }
-  }, [gridSize, initBoard]);
+    updateBestMoves();
+  }, [gridSize, initBoard, updateBestMoves]);
 
   useEffect(() => {
     const storedHistory = localStorage.getItem('puzzle_image_history');
@@ -72,11 +88,11 @@ const App: React.FC = () => {
 
   useEffect(() => {
     if (board.length > 0) {
-      const stateToSave = { board, moves, seconds, imageUrl, gridSize, history: historyRef.current, difficulty, spacing };
+      const stateToSave = { board, moves, seconds, imageUrl, gridSize, history: historyRef.current, difficulty, spacing, showNumbers };
       localStorage.setItem('puzzle_current_state', JSON.stringify(stateToSave));
     }
     setDistance(getManhattanDistance(board, gridSize));
-  }, [board, moves, seconds, imageUrl, gridSize, difficulty, spacing]);
+  }, [board, moves, seconds, imageUrl, gridSize, difficulty, spacing, showNumbers]);
 
   useEffect(() => {
     if (moves > 0 && !isGameFinished && !isSolving) {
@@ -113,8 +129,9 @@ const App: React.FC = () => {
   const saveStats = (m: number, t: number, s: GridSize) => {
     const stats: StatsEntry[] = JSON.parse(localStorage.getItem('puzzle_stats') || '[]');
     const entry: StatsEntry = { date: new Date().toLocaleDateString(), moves: m, time: t, gridSize: `${s.rows}x${s.cols}` };
-    const updated = [entry, ...stats].sort((a,b) => a.moves - b.moves).slice(0, 10);
+    const updated = [entry, ...stats].sort((a,b) => a.moves - b.moves).slice(0, 50);
     localStorage.setItem('puzzle_stats', JSON.stringify(updated));
+    updateBestMoves();
   };
 
   const shuffle = () => {
@@ -153,7 +170,11 @@ const App: React.FC = () => {
     if (isSolving || isGameFinished) return;
     const emptyIdx = board.indexOf(board.length - 1);
     const movables = getMovableIndices(emptyIdx, gridSize);
-    const target = movables[Math.floor(Math.random() * movables.length)];
+    // Find a tile that isn't already in its correct position if possible
+    const misplaced = movables.filter(idx => board[idx] !== idx);
+    const target = misplaced.length > 0 
+      ? misplaced[Math.floor(Math.random() * misplaced.length)]
+      : movables[Math.floor(Math.random() * movables.length)];
     setClueTileIdx(target);
   };
 
@@ -166,7 +187,6 @@ const App: React.FC = () => {
     setIsSolving(true);
     abortSolvingRef.current = false;
     
-    // We reverse the history recorded during shuffle or play to find the path back
     const steps = [...historyRef.current].reverse();
     for (const step of steps) {
       if (abortSolvingRef.current) break;
@@ -213,10 +233,14 @@ const App: React.FC = () => {
 
       <div className="text-center mt-2 flex flex-col items-center">
         <h1 className="text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-indigo-500 tracking-tighter mb-1 uppercase">Puzzle Master</h1>
-        <div className="flex gap-6 text-[10px] font-bold text-slate-400 uppercase tracking-widest justify-center">
+        <div className="flex gap-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest justify-center">
             <div className="flex flex-col items-center">
                 <span className="text-white text-base leading-none mb-1">{moves}</span>
                 <span>Moves</span>
+            </div>
+            <div className="flex flex-col items-center">
+                <span className="text-blue-400 text-base leading-none mb-1">{bestMoves ?? '--'}</span>
+                <span>Best</span>
             </div>
             <div className="flex flex-col items-center">
                 <span className="text-white text-base leading-none mb-1">{distance}</span>
@@ -238,6 +262,7 @@ const App: React.FC = () => {
           spacing={spacing}
           movingTileIdx={movingTileIdx}
           clueTileIdx={clueTileIdx}
+          showNumbers={showNumbers}
         />
       </div>
 
@@ -264,7 +289,7 @@ const App: React.FC = () => {
                         onClick={() => { initBoard(gridSize); shuffle(); }}
                         className="w-full py-4 bg-blue-600 hover:bg-blue-500 rounded-2xl font-black text-sm tracking-widest transition-all shadow-lg active:scale-95"
                     >
-                        PLAY AGAIN
+                        RESTART PUZZLE
                     </button>
                     <button 
                         onClick={() => setIsGameFinished(false)}
@@ -286,6 +311,8 @@ const App: React.FC = () => {
         setDifficulty={setDifficulty}
         spacing={spacing}
         setSpacing={setSpacing}
+        showNumbers={showNumbers}
+        setShowNumbers={setShowNumbers}
         imageHistory={imageHistory}
         onSelectHistoryImage={setImageUrl}
         onPickImage={pickImage}

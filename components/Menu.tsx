@@ -10,6 +10,8 @@ interface MenuProps {
   setDifficulty: (d: Difficulty) => void;
   spacing: number;
   setSpacing: (v: number) => void;
+  showNumbers: boolean;
+  setShowNumbers: (v: boolean) => void;
   imageHistory: string[];
   onSelectHistoryImage: (url: string) => void;
   onPickImage: (e: React.ChangeEvent<HTMLInputElement>) => void;
@@ -18,7 +20,7 @@ interface MenuProps {
 
 const Menu: React.FC<MenuProps> = ({
   isOpen, onClose, gridSize, setGridSize, difficulty, setDifficulty,
-  spacing, setSpacing, imageHistory, onSelectHistoryImage, onPickImage, onLoadSaved
+  spacing, setSpacing, showNumbers, setShowNumbers, imageHistory, onSelectHistoryImage, onPickImage, onLoadSaved
 }) => {
   if (!isOpen) return null;
 
@@ -40,7 +42,7 @@ const Menu: React.FC<MenuProps> = ({
         <section>
             <button 
                 onClick={() => { onLoadSaved(); onClose(); }}
-                className="w-full py-3 bg-blue-600/20 border border-blue-500/30 text-blue-400 rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-blue-600/30 transition-all"
+                className="w-full py-4 bg-blue-600/20 border border-blue-500/30 text-blue-400 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-blue-600/30 transition-all active:scale-95"
             >
                 Load Saved State
             </button>
@@ -49,8 +51,9 @@ const Menu: React.FC<MenuProps> = ({
         {/* Pick Picture */}
         <section>
             <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em] mb-3">Pick Picture</h3>
-            <label className="flex flex-col items-center justify-center w-full h-16 border-2 border-dashed border-slate-700 rounded-2xl hover:bg-slate-800 transition-colors cursor-pointer group mb-3">
-                <span className="text-xs text-slate-500 font-bold group-hover:text-blue-400">From Gallery</span>
+            <label className="flex flex-col items-center justify-center w-full h-20 bg-slate-800 border-2 border-slate-700 border-dashed rounded-2xl hover:bg-slate-750 transition-all cursor-pointer group mb-4 active:scale-95">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mb-2 text-slate-500 group-hover:text-blue-400"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                <span className="text-xs text-slate-400 font-black group-hover:text-blue-400 tracking-tighter">UPLOAD FROM GALLERY</span>
                 <input type="file" accept="image/*" onChange={(e) => { onPickImage(e); onClose(); }} className="hidden" />
             </label>
             {imageHistory.length > 0 && (
@@ -58,13 +61,24 @@ const Menu: React.FC<MenuProps> = ({
                     {imageHistory.map((url, i) => (
                         <button 
                             key={i} 
-                            onClick={() => onSelectHistoryImage(url)}
-                            className="flex-shrink-0 w-12 h-12 rounded-lg bg-cover bg-center border border-slate-700 active:scale-90 transition-transform"
+                            onClick={() => { onSelectHistoryImage(url); onClose(); }}
+                            className="flex-shrink-0 w-12 h-12 rounded-lg bg-cover bg-center border-2 border-slate-700 active:scale-90 transition-all hover:border-blue-500"
                             style={{ backgroundImage: `url(${url})` }}
                         />
                     ))}
                 </div>
             )}
+        </section>
+
+        {/* Toggles */}
+        <section className="flex items-center justify-between p-4 bg-slate-800/50 rounded-2xl border border-white/5">
+            <span className="text-xs font-black text-slate-300 tracking-tight">SHOW NUMBERS</span>
+            <button 
+                onClick={() => setShowNumbers(!showNumbers)}
+                className={`relative w-12 h-6 rounded-full transition-colors ${showNumbers ? 'bg-blue-600' : 'bg-slate-700'}`}
+            >
+                <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${showNumbers ? 'left-7' : 'left-1'}`} />
+            </button>
         </section>
 
         {/* Grid Selection */}

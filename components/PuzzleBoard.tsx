@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { GridSize } from '../types';
 
@@ -10,10 +9,11 @@ interface PuzzleBoardProps {
   spacing: number;
   movingTileIdx: number | null;
   clueTileIdx: number | null;
+  showNumbers: boolean;
 }
 
 const PuzzleBoard: React.FC<PuzzleBoardProps> = ({ 
-  board, gridSize, imageUrl, onTileClick, spacing, movingTileIdx, clueTileIdx 
+  board, gridSize, imageUrl, onTileClick, spacing, movingTileIdx, clueTileIdx, showNumbers 
 }) => {
   const [boardSize, setBoardSize] = useState(300);
 
@@ -63,10 +63,17 @@ const PuzzleBoard: React.FC<PuzzleBoardProps> = ({
               backgroundPosition: `${(origCol / (gridSize.cols - 1)) * 100}% ${(origRow / (gridSize.rows - 1)) * 100}%`,
             }}
           >
+            {/* Number Overlay */}
+            {showNumbers && (
+              <div className="absolute top-1 left-1 bg-black/40 backdrop-blur-sm rounded-md px-1.5 py-0.5 min-w-[1.2rem] text-center">
+                <span className="text-[10px] font-black text-white">{val + 1}</span>
+              </div>
+            )}
+
             {/* Clue indicator: yellow dot */}
             {isClue && (
-              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                <div className="w-4 h-4 rounded-full bg-yellow-400 shadow-[0_0_15px_rgba(250,204,21,1)] clue-dot" />
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none bg-yellow-400/10">
+                <div className="w-5 h-5 rounded-full bg-yellow-400 shadow-[0_0_20px_rgba(250,204,21,1)] border-2 border-white clue-dot" />
               </div>
             )}
             
@@ -77,7 +84,7 @@ const PuzzleBoard: React.FC<PuzzleBoardProps> = ({
               </div>
             )}
 
-            {/* Hover overlay */}
+            {/* Hover/Active overlay */}
             <div className="absolute inset-0 bg-white/0 group-active:bg-white/20 transition-colors" />
           </div>
         );
