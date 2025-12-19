@@ -28,8 +28,9 @@ const App: React.FC = () => {
   const [bestMoves, setBestMoves] = useState<number | null>(null);
   const [hasShuffled, setHasShuffled] = useState(false);
   
-  const historyRef = useRef<number[][]>([]);
-  const shuffleDepthRef = useRef<number>(0);
+  const [history, setHistory] = useState<number[][]>([]);
+  const [shuffleDepth, setShuffleDepth] = useState(0);
+  
   const timerRef = useRef<number | null>(null);
   const abortSolvingRef = useRef(false);
 
@@ -62,8 +63,8 @@ const App: React.FC = () => {
     setSeconds(0);
     setDistance(0);
     setHasShuffled(false);
-    historyRef.current = [];
-    shuffleDepthRef.current = 0;
+    setHistory([]);
+    setShuffleDepth(0);
     setIsGameFinished(false);
     setClueTileIdx(null);
     setMovingTileIdx(null);
@@ -83,8 +84,8 @@ const App: React.FC = () => {
             setSeconds(parsed.seconds);
             setImageUrl(parsed.imageUrl);
             setGridSize(parsed.gridSize);
-            historyRef.current = parsed.history || [];
-            shuffleDepthRef.current = parsed.shuffleDepth || 0;
+            setHistory(parsed.history || []);
+            setShuffleDepth(parsed.shuffleDepth || 0);
             setDifficulty(parsed.difficulty || 'Medium');
             setSpacing(parsed.spacing || 2);
             setShowNumbers(parsed.showNumbers ?? true);
@@ -117,7 +118,7 @@ const App: React.FC = () => {
     if (board.length > 0) {
       const stateToSave = { 
         board, moves, requiredMoves, seconds, imageUrl, gridSize, 
-        history: historyRef.current, shuffleDepth: shuffleDepthRef.current,
+        history, shuffleDepth,
         difficulty, spacing, showNumbers, tileShape, hasShuffled 
       };
       try {
@@ -127,7 +128,7 @@ const App: React.FC = () => {
       }
     }
     setDistance(getManhattanDistance(board, gridSize));
-  }, [board, moves, requiredMoves, seconds, imageUrl, gridSize, difficulty, spacing, showNumbers, tileShape, hasShuffled]);
+  }, [board, moves, requiredMoves, seconds, imageUrl, gridSize, difficulty, spacing, showNumbers, tileShape, hasShuffled, history, shuffleDepth]);
 
   const isTimerActive = moves > 0 && !isGameFinished && !isSolving;
   useEffect(() => {
@@ -166,13 +167,13 @@ const App: React.FC = () => {
       const nextBoard = [...board];
       [nextBoard[index], nextBoard[emptyIdx]] = [nextBoard[emptyIdx], nextBoard[index]];
       
-      const previousState = historyRef.current[historyRef.current.length - 1];
+      const previousState = history[history.length - 1];
       const isCorrectBacktrack = previousState && previousState.every((val, i) => val === nextBoard[i]);
 
       if (isCorrectBacktrack) {
-        historyRef.current.pop();
+        setHistory(prev => prev.slice(0, -1));
       } else {
-        historyRef.current.push(currentBoard);
+        setHistory(prev => [...prev, currentBoard]);
       }
 
       setBoard(nextBoard);
@@ -195,18 +196,19 @@ const App: React.FC = () => {
     let curr = Array.from({ length: gridSize.rows * gridSize.cols }, (_, i) => i);
     const shuffleCount = difficulty === 'Easy' ? 20 : difficulty === 'Medium' ? 50 : 150;
     let lastEmpty = -1;
-    historyRef.current = [];
+    const newHistory: number[][] = [];
 
     for (let i = 0; i < shuffleCount; i++) {
       const emptyIdx = curr.indexOf(curr.length - 1);
       const movables = getMovableIndices(emptyIdx, gridSize).filter(idx => idx !== lastEmpty);
       const move = movables[Math.floor(Math.random() * movables.length)];
-      historyRef.current.push([...curr]);
+      newHistory.push([...curr]);
       [curr[emptyIdx], curr[move]] = [curr[move], curr[emptyIdx]];
       lastEmpty = emptyIdx;
     }
     
-    shuffleDepthRef.current = historyRef.current.length;
+    setHistory(newHistory);
+    setShuffleDepth(newHistory.length);
     setBoard(curr);
     setMoves(0);
     setRequiredMoves(shuffleCount);
@@ -216,19 +218,22 @@ const App: React.FC = () => {
   };
 
   const undo = () => {
-    if (isSolving || historyRef.current.length <= shuffleDepthRef.current) return;
-    const last = historyRef.current.pop();
+    if (isSolving || history.length <= shuffleDepth) return;
+    const newHistory = [...history];
+    const last = newHistory.pop();
     if (last) {
       setBoard(last);
-      setMoves(m => m + 1);
+      setHistory(newHistory);
+      // Reverting a move should decrement the counter for the best user experience
+      setMoves(m => Math.max(0, m - 1));
       setClueTileIdx(null);
       setIsGameFinished(false);
     }
   };
 
   const getClue = () => {
-    if (isSolving || isGameFinished || !hasShuffled || historyRef.current.length === 0) return;
-    const previousState = historyRef.current[historyRef.current.length - 1];
+    if (isSolving || isGameFinished || !hasShuffled || history.length === 0) return;
+    const previousState = history[history.length - 1];
     const emptyIdxInPrevious = previousState.indexOf(board.length - 1);
     setClueTileIdx(emptyIdxInPrevious);
   };
@@ -243,9 +248,11 @@ const App: React.FC = () => {
     setIsSolving(true);
     abortSolvingRef.current = false;
     
+    let currentHistory = [...history];
     let moveCounter = moves;
-    while (historyRef.current.length > 0 && !abortSolvingRef.current) {
-      const previousState = historyRef.current[historyRef.current.length - 1];
+
+    while (currentHistory.length > 0 && !abortSolvingRef.current) {
+      const previousState = currentHistory[currentHistory.length - 1];
       const emptyIdxInPrevious = previousState.indexOf(board.length - 1);
       
       setMovingTileIdx(emptyIdxInPrevious);
@@ -255,7 +262,17 @@ const App: React.FC = () => {
       
       const nextBoard = [...previousState];
       setBoard(nextBoard);
-      historyRef.current.pop();
+      currentHistory.pop();
+      
+      // Update local state copy and the actual history state
+      const updatedHistory = [...currentHistory];
+      setHistory(updatedHistory);
+      
+      // If we solve back past user moves, reset shuffle depth to protect logic
+      if (updatedHistory.length < shuffleDepth) {
+          setShuffleDepth(updatedHistory.length);
+      }
+      
       moveCounter++;
       setMoves(moveCounter);
       setMovingTileIdx(null);
@@ -277,27 +294,32 @@ const App: React.FC = () => {
         const img = new Image();
         img.onload = () => {
             const canvas = document.createElement('canvas');
-            const MAX_SIZE = 700;
-            let width = img.width;
-            let height = img.height;
-            if (width > height) {
-                if (width > MAX_SIZE) {
-                    height *= MAX_SIZE / width;
-                    width = MAX_SIZE;
-                }
+            const targetAspect = gridSize.cols / gridSize.rows;
+            const imgAspect = img.width / img.height;
+            
+            let cropWidth, cropHeight, offsetX, offsetY;
+            
+            if (imgAspect > targetAspect) {
+                cropHeight = img.height;
+                cropWidth = img.height * targetAspect;
+                offsetX = (img.width - cropWidth) / 2;
+                offsetY = 0;
             } else {
-                if (height > MAX_SIZE) {
-                    width *= MAX_SIZE / height;
-                    height = MAX_SIZE;
-                }
+                cropWidth = img.width;
+                cropHeight = img.width / targetAspect;
+                offsetX = 0;
+                offsetY = (img.height - cropHeight) / 2;
             }
-            canvas.width = width;
-            canvas.height = height;
+            
+            const BASE_SIZE = 800;
+            canvas.width = BASE_SIZE * targetAspect;
+            canvas.height = BASE_SIZE;
+            
             const ctx = canvas.getContext('2d');
             if (ctx) {
-              ctx.drawImage(img, 0, 0, width, height);
+              ctx.drawImage(img, offsetX, offsetY, cropWidth, cropHeight, 0, 0, canvas.width, canvas.height);
               try {
-                const dataUrl = canvas.toDataURL('image/jpeg', 0.6);
+                const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
                 setImageUrl(dataUrl);
                 const updated = [dataUrl, ...imageHistory.filter(x => x !== dataUrl)].slice(0, 5);
                 setImageHistory(updated);
@@ -314,12 +336,10 @@ const App: React.FC = () => {
     e.target.value = '';
   };
 
-  const canUndo = !isSolving && historyRef.current.length > shuffleDepthRef.current;
+  const canUndoValue = !isSolving && history.length > shuffleDepth;
 
   return (
     <div className="w-full h-full flex flex-col items-center justify-start overflow-y-auto overflow-x-hidden p-4 md:p-12">
-      
-      {/* HEADER SECTION */}
       <div className="w-full max-w-[420px] mb-8 flex flex-col items-center">
         <div className="flex items-center justify-between w-full mb-8">
             <button 
@@ -336,7 +356,6 @@ const App: React.FC = () => {
             <div className="w-[50px]"></div>
         </div>
 
-        {/* HUD DASHBOARD */}
         <div className="grid grid-cols-5 w-full gap-2.5">
             {[
                 { label: 'Moves', val: moves, color: 'text-white' },
@@ -353,7 +372,6 @@ const App: React.FC = () => {
         </div>
       </div>
 
-      {/* BOARD SECTION */}
       <div className="flex items-center justify-center mb-10">
           <PuzzleBoard 
             board={board} 
@@ -368,7 +386,6 @@ const App: React.FC = () => {
           />
       </div>
 
-      {/* CONTROLS SECTION */}
       <div className="w-full max-w-[420px] pb-12">
           <Controls 
             onShuffle={shuffle}
@@ -376,11 +393,10 @@ const App: React.FC = () => {
             onClue={getClue}
             onUndo={undo}
             isSolving={isSolving}
-            canUndo={canUndo}
+            canUndo={canUndoValue}
           />
       </div>
 
-      {/* Win Modal Overlay */}
       {isGameFinished && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/95 backdrop-blur-xl p-6">
             <div className="bg-slate-900 border border-slate-700/50 p-10 rounded-[3rem] shadow-2xl text-center w-full max-w-sm animate-pop relative overflow-hidden">
@@ -398,7 +414,6 @@ const App: React.FC = () => {
         </div>
       )}
 
-      {/* Menu Sidebar */}
       <Menu 
         isOpen={isMenuOpen}
         onClose={() => setIsMenuOpen(false)}
