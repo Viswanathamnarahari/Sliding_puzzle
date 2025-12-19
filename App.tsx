@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { GridSize, Difficulty, StatsEntry, TileShape } from './types';
 import { isAdjacent, getMovableIndices, isSolved, getManhattanDistance } from './services/puzzleLogic';
@@ -410,6 +409,7 @@ const App: React.FC = () => {
                 <div className="flex flex-col gap-3">
                     <button onClick={() => shuffle()} className="w-full py-5 bg-blue-600 hover:bg-blue-500 rounded-2xl font-black text-[10px] tracking-[0.2em] transition-all shadow-xl active:scale-95 text-white">RESTART MATRIX</button>
                     <button onClick={() => setIsGameFinished(false)} className="w-full py-5 bg-slate-800 hover:bg-slate-750 rounded-2xl font-bold text-[10px] text-slate-400 tracking-[0.2em] transition-all active:scale-95 uppercase">Dismiss</button>
+                    <p className="text-[9px] text-slate-500 font-medium tracking-tight mt-2 opacity-50">viswanatham@gmail.com</p>
                 </div>
             </div>
         </div>
