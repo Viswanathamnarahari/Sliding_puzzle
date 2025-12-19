@@ -170,12 +170,21 @@ const App: React.FC = () => {
     if (isSolving || isGameFinished) return;
     const emptyIdx = board.indexOf(board.length - 1);
     const movables = getMovableIndices(emptyIdx, gridSize);
-    // Find a tile that isn't already in its correct position if possible
-    const misplaced = movables.filter(idx => board[idx] !== idx);
-    const target = misplaced.length > 0 
-      ? misplaced[Math.floor(Math.random() * misplaced.length)]
-      : movables[Math.floor(Math.random() * movables.length)];
-    setClueTileIdx(target);
+    
+    // Smart clue: find the move that reduces Manhattan distance the most
+    let bestIdx = movables[0];
+    let minDistance = Infinity;
+    
+    for (const idx of movables) {
+        const tempBoard = [...board];
+        [tempBoard[idx], tempBoard[emptyIdx]] = [tempBoard[emptyIdx], tempBoard[idx]];
+        const d = getManhattanDistance(tempBoard, gridSize);
+        if (d < minDistance) {
+            minDistance = d;
+            bestIdx = idx;
+        }
+    }
+    setClueTileIdx(bestIdx);
   };
 
   const solve = async () => {
@@ -204,7 +213,10 @@ const App: React.FC = () => {
       if (isSolved(step)) break;
     }
     setIsSolving(false);
-    if (isSolved(board)) setIsGameFinished(true);
+    if (isSolved(board)) {
+        setIsGameFinished(true);
+        saveStats(moves, seconds, gridSize);
+    }
   };
 
   const pickImage = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -212,11 +224,36 @@ const App: React.FC = () => {
     if (file) {
       const reader = new FileReader();
       reader.onload = (ev) => {
-        const url = ev.target?.result as string;
-        setImageUrl(url);
-        const updated = [url, ...imageHistory.filter(x => x !== url)].slice(0, 10);
-        setImageHistory(updated);
-        localStorage.setItem('puzzle_image_history', JSON.stringify(updated));
+        const img = new Image();
+        img.onload = () => {
+            // Resize image to max 1024px to prevent "blank screen" crash on some mobile devices
+            const canvas = document.createElement('canvas');
+            const MAX_SIZE = 1024;
+            let width = img.width;
+            let height = img.height;
+            if (width > height) {
+                if (width > MAX_SIZE) {
+                    height *= MAX_SIZE / width;
+                    width = MAX_SIZE;
+                }
+            } else {
+                if (height > MAX_SIZE) {
+                    width *= MAX_SIZE / height;
+                    height = MAX_SIZE;
+                }
+            }
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            ctx?.drawImage(img, 0, 0, width, height);
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+            
+            setImageUrl(dataUrl);
+            const updated = [dataUrl, ...imageHistory.filter(x => x !== dataUrl)].slice(0, 10);
+            setImageHistory(updated);
+            localStorage.setItem('puzzle_image_history', JSON.stringify(updated));
+        };
+        img.src = ev.target?.result as string;
       };
       reader.readAsDataURL(file);
     }
