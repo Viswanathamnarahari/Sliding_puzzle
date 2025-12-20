@@ -1,0 +1,7 @@
+Version Control: Always update the version string in Menu.tsx using the YYMMDD.I format (e.g., 251219.1).
+YY : current year
+MM: Current month of year
+DD: Current day of month
+I  : Iteration for the day.
+
+General: For working specs or logic, Do not change any file without letting me know.
