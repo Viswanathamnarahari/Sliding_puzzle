@@ -15,7 +15,7 @@ const App: React.FC = () => {
   const [seconds, setSeconds] = useState(0);
   const [distance, setDistance] = useState(0);
   const [imageUrl, setImageUrl] = useState(DEFAULT_IMAGE);
-  const [difficulty, setDifficulty] = useState<Difficulty>('Medium');
+  const [difficulty, setDifficulty] = useState<Difficulty>('Easy');
   const [spacing, setSpacing] = useState(2);
   const [showNumbers, setShowNumbers] = useState(true);
   const [tileShape, setTileShape] = useState<TileShape>('square');
@@ -86,7 +86,7 @@ const App: React.FC = () => {
             setGridSize(parsed.gridSize);
             setHistory(parsed.history || []);
             setShuffleDepth(parsed.shuffleDepth || 0);
-            setDifficulty(parsed.difficulty || 'Medium');
+            setDifficulty(parsed.difficulty || 'Easy');
             setSpacing(parsed.spacing || 2);
             setShowNumbers(parsed.showNumbers ?? true);
             setTileShape(parsed.tileShape || 'square');
@@ -224,7 +224,6 @@ const App: React.FC = () => {
     if (last) {
       setBoard(last);
       setHistory(newHistory);
-      // Reverting a move should decrement the counter for the best user experience
       setMoves(m => Math.max(0, m - 1));
       setClueTileIdx(null);
       setIsGameFinished(false);
@@ -264,11 +263,9 @@ const App: React.FC = () => {
       setBoard(nextBoard);
       currentHistory.pop();
       
-      // Update local state copy and the actual history state
       const updatedHistory = [...currentHistory];
       setHistory(updatedHistory);
       
-      // If we solve back past user moves, reset shuffle depth to protect logic
       if (updatedHistory.length < shuffleDepth) {
           setShuffleDepth(updatedHistory.length);
       }
@@ -342,18 +339,34 @@ const App: React.FC = () => {
     <div className="w-full h-full flex flex-col items-center justify-start overflow-y-auto overflow-x-hidden p-4 md:p-12">
       <div className="w-full max-w-[420px] mb-8 flex flex-col items-center">
         <div className="flex items-center justify-between w-full mb-8">
-            <button 
-                onClick={() => setIsMenuOpen(true)}
-                className="p-3.5 rounded-2xl bg-white/5 border border-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition-all shadow-xl active:scale-90"
-                aria-label="Open Menu"
-            >
-                <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>
-            </button>
+            <div className="flex items-center gap-2">
+                <button 
+                    onClick={() => setIsMenuOpen(true)}
+                    className="p-3.5 rounded-2xl bg-white/5 border border-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition-all shadow-xl active:scale-90"
+                    aria-label="Open Menu"
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>
+                </button>
+                <label className="p-3.5 rounded-2xl bg-white/5 border border-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition-all shadow-xl active:scale-90 cursor-pointer">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
+                    <input type="file" accept="image/*" onChange={pickImage} className="hidden" />
+                </label>
+            </div>
             <h1 className="text-2xl font-black text-white/95 tracking-tighter uppercase flex items-center gap-2">
                 <span className="opacity-30">R3AL</span> 
                 <span className="text-blue-500 drop-shadow-[0_0_12px_rgba(59,130,246,0.4)]">PUZZLE</span>
             </h1>
-            <div className="w-[50px]"></div>
+            <div className="flex items-center">
+              <select 
+                value={difficulty} 
+                onChange={(e) => setDifficulty(e.target.value as Difficulty)}
+                className="bg-slate-800/80 border border-white/10 rounded-xl px-2.5 py-2 text-[9px] font-black uppercase text-blue-400 outline-none appearance-none cursor-pointer hover:bg-slate-700 transition-colors shadow-lg min-w-[70px] text-center"
+              >
+                <option value="Easy">Easy</option>
+                <option value="Medium">Medium</option>
+                <option value="Hard">Hard</option>
+              </select>
+            </div>
         </div>
 
         <div className="grid grid-cols-5 w-full gap-2.5">

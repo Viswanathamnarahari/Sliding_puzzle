@@ -3,5 +3,6 @@ YY : current year
 MM: Current month of year
 DD: Current day of month
 I  : Iteration for the day.
+Do not update Version string till further instructions. Update only when specifically asked.
 
 General: For working specs or logic, Do not change any file without letting me know.
