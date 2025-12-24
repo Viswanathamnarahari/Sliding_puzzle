@@ -130,6 +130,13 @@ const App: React.FC = () => {
     setDistance(getManhattanDistance(board, gridSize));
   }, [board, moves, requiredMoves, seconds, imageUrl, gridSize, difficulty, spacing, showNumbers, tileShape, hasShuffled, history, shuffleDepth]);
 
+  // Sync Target steps with history length
+  useEffect(() => {
+    if (hasShuffled) {
+      setRequiredMoves(history.length);
+    }
+  }, [history.length, hasShuffled]);
+
   const isTimerActive = moves > 0 && !isGameFinished && !isSolving;
   useEffect(() => {
     if (isTimerActive) {
@@ -211,7 +218,7 @@ const App: React.FC = () => {
     setShuffleDepth(newHistory.length);
     setBoard(curr);
     setMoves(0);
-    setRequiredMoves(shuffleCount);
+    setRequiredMoves(newHistory.length);
     setSeconds(0);
     setClueTileIdx(null);
     setHasShuffled(true);

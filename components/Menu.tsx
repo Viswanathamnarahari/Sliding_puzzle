@@ -3,7 +3,7 @@ import { GridSize, Difficulty, StatsEntry, TileShape } from '../types';
 
 interface MenuProps {
   isOpen: boolean;
-  onClose: void;
+  onClose: () => void;
   gridSize: GridSize;
   setGridSize: (s: GridSize) => void;
   difficulty: Difficulty;
@@ -87,7 +87,7 @@ const Menu: React.FC<MenuProps> = ({
           <p className="text-blue-400 font-bold tracking-widest text-[10px] uppercase">For grand kids</p>
           <div className="w-8 h-px bg-slate-800 my-4" />
           <p className="text-slate-400 text-xs font-medium">Viswanatham@gmail.com</p>
-          <p className="text-slate-600 text-[10px] font-black tracking-[0.2em] mt-8 uppercase">251221.1</p>
+          <p className="text-slate-600 text-[10px] font-black tracking-[0.2em] mt-8 uppercase">251224.1</p>
       </div>
       
       <button 
