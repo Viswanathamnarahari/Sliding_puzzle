@@ -75,14 +75,17 @@ const App: React.FC = () => {
   }, [updateBestMoves]);
 
   const loadSavedState = useCallback(() => {
-    const lastState = localStorage.getItem('puzzle_current_state');
-    if (lastState) {
+    // Reconcile split storage: Main data vs Timer
+    const lastData = localStorage.getItem('puzzle_current_state_data');
+    const lastSeconds = localStorage.getItem('puzzle_current_seconds');
+    
+    if (lastData) {
         try {
-            const parsed = JSON.parse(lastState);
+            const parsed = JSON.parse(lastData);
             setBoard(parsed.board);
             setMoves(parsed.moves);
             setRequiredMoves(parsed.requiredMoves || 0);
-            setSeconds(parsed.seconds);
+            setSeconds(lastSeconds ? parseInt(lastSeconds, 10) : 0);
             setImageUrl(parsed.imageUrl || DEFAULT_IMAGE);
             setGridSize(parsed.gridSize);
             setHistory(parsed.history || []);
@@ -115,21 +118,31 @@ const App: React.FC = () => {
     loadSavedState();
   }, [loadSavedState]);
 
+  // Save heavy state ONLY when structural data changes (NOT every second)
   useEffect(() => {
     if (board.length > 0) {
       const stateToSave = { 
-        board, moves, requiredMoves, seconds, imageUrl, gridSize, 
+        board, moves, requiredMoves, imageUrl, gridSize, 
         history, shuffleDepth,
         difficulty, spacing, showNumbers, tileShape, hasShuffled 
       };
       try {
-        localStorage.setItem('puzzle_current_state', JSON.stringify(stateToSave));
+        localStorage.setItem('puzzle_current_state_data', JSON.stringify(stateToSave));
       } catch (e) {
-        // Handle quota issues
+        console.warn('LocalStorage quota likely exceeded');
       }
     }
     setDistance(getManhattanDistance(board, gridSize));
-  }, [board, moves, requiredMoves, seconds, imageUrl, gridSize, difficulty, spacing, showNumbers, tileShape, hasShuffled, history, shuffleDepth]);
+  }, [board, moves, requiredMoves, imageUrl, gridSize, difficulty, spacing, showNumbers, tileShape, hasShuffled, history, shuffleDepth]);
+
+  // Save timer separately to avoid expensive serialization every second
+  useEffect(() => {
+    if (seconds > 0 && !isGameFinished) {
+      try {
+        localStorage.setItem('puzzle_current_seconds', seconds.toString());
+      } catch (e) {}
+    }
+  }, [seconds, isGameFinished]);
 
   // Sync Target steps with history length
   useEffect(() => {
@@ -156,15 +169,17 @@ const App: React.FC = () => {
   }, [isTimerActive]);
 
   const saveStats = useCallback((m: number, t: number, s: GridSize) => {
-    const stats: StatsEntry[] = JSON.parse(localStorage.getItem('puzzle_stats') || '[]');
-    const entry: StatsEntry = { 
-      date: new Date().toLocaleDateString(), 
-      moves: m, 
-      time: t, 
-      gridSize: `${s.rows}x${s.cols}` 
-    };
-    const updated = [entry, ...stats].sort((a,b) => a.moves - b.moves).slice(0, 50);
-    localStorage.setItem('puzzle_stats', JSON.stringify(updated));
+    try {
+      const stats: StatsEntry[] = JSON.parse(localStorage.getItem('puzzle_stats') || '[]');
+      const entry: StatsEntry = { 
+        date: new Date().toLocaleDateString(), 
+        moves: m, 
+        time: t, 
+        gridSize: `${s.rows}x${s.cols}` 
+      };
+      const updated = [entry, ...stats].sort((a,b) => a.moves - b.moves).slice(0, 50);
+      localStorage.setItem('puzzle_stats', JSON.stringify(updated));
+    } catch (e) {}
     updateBestMoves();
   }, [updateBestMoves]);
 
