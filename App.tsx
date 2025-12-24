@@ -5,7 +5,8 @@ import PuzzleBoard from './components/PuzzleBoard';
 import Controls from './components/Controls';
 import Menu from './components/Menu';
 
-const DEFAULT_IMAGE = 'https://picsum.photos/800/800?random=42';
+// A valid, small Base64 encoded image to ensure offline functionality and fix syntax errors
+const DEFAULT_IMAGE = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/2wBDAQkJCQwLDBgNDRgyIRwhMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjL/wAARCAAQABADASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZnaGlqc3R1dnd4eXqGhf/aAAwDAQACEQMRAD8A9/ooooA//9k=';
 
 const App: React.FC = () => {
   const [board, setBoard] = useState<number[]>([]);
@@ -82,7 +83,7 @@ const App: React.FC = () => {
             setMoves(parsed.moves);
             setRequiredMoves(parsed.requiredMoves || 0);
             setSeconds(parsed.seconds);
-            setImageUrl(parsed.imageUrl);
+            setImageUrl(parsed.imageUrl || DEFAULT_IMAGE);
             setGridSize(parsed.gridSize);
             setHistory(parsed.history || []);
             setShuffleDepth(parsed.shuffleDepth || 0);
@@ -112,7 +113,7 @@ const App: React.FC = () => {
       }
     }
     loadSavedState();
-  }, []);
+  }, [loadSavedState]);
 
   useEffect(() => {
     if (board.length > 0) {
@@ -124,7 +125,7 @@ const App: React.FC = () => {
       try {
         localStorage.setItem('puzzle_current_state', JSON.stringify(stateToSave));
       } catch (e) {
-        localStorage.removeItem('puzzle_image_history');
+        // Handle quota issues
       }
     }
     setDistance(getManhattanDistance(board, gridSize));
@@ -149,7 +150,9 @@ const App: React.FC = () => {
         timerRef.current = null;
       }
     }
-    return () => {};
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
   }, [isTimerActive]);
 
   const saveStats = useCallback((m: number, t: number, s: GridSize) => {
@@ -225,7 +228,7 @@ const App: React.FC = () => {
   };
 
   const undo = () => {
-    if (isSolving || history.length <= shuffleDepth) return;
+    if (isSolving || history.length === 0) return;
     const newHistory = [...history];
     const last = newHistory.pop();
     if (last) {
@@ -272,10 +275,6 @@ const App: React.FC = () => {
       
       const updatedHistory = [...currentHistory];
       setHistory(updatedHistory);
-      
-      if (updatedHistory.length < shuffleDepth) {
-          setShuffleDepth(updatedHistory.length);
-      }
       
       moveCounter++;
       setMoves(moveCounter);
@@ -340,7 +339,7 @@ const App: React.FC = () => {
     e.target.value = '';
   };
 
-  const canUndoValue = !isSolving && history.length > shuffleDepth;
+  const canUndoValue = !isSolving && history.length > 0;
 
   return (
     <div className="w-full h-full flex flex-col items-center justify-start overflow-y-auto overflow-x-hidden p-4 md:p-12">
@@ -407,6 +406,7 @@ const App: React.FC = () => {
       </div>
 
       <div className="w-full max-w-[420px] pb-12">
+          <button onClick={() => shuffle()} className="w-full mb-3 py-4 bg-blue-600 border border-blue-400 text-white rounded-2xl font-black uppercase tracking-widest text-[10px] active:scale-95 transition-all shadow-xl">Shuffle Pieces</button>
           <Controls 
             onShuffle={shuffle}
             onSolve={solve}
