@@ -326,7 +326,7 @@ const App: React.FC = () => {
       className="w-full h-full flex flex-col items-center justify-start overflow-y-auto overflow-x-hidden pb-[max(1.5rem,env(safe-area-inset-bottom))] pl-[max(1.5rem,env(safe-area-inset-left))] pr-[max(1.5rem,env(safe-area-inset-right))] md:p-12"
       style={{
         paddingTop: isIOS 
-          ? 'calc(max(1.5rem, env(safe-area-inset-top)) + 1rem)' 
+          ? 'calc(max(1.5rem, env(safe-area-inset-top)) + 0.75rem)' 
           : 'max(1.5rem, env(safe-area-inset-top))'
       }}
     >
