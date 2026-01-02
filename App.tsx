@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { GridSize, Difficulty, StatsEntry, TileShape } from './types';
 import { isAdjacent, getMovableIndices, isSolved } from './services/puzzleLogic';
 import PuzzleBoard from './components/PuzzleBoard';
@@ -14,9 +14,9 @@ interface UndoStep {
 
 const App: React.FC = () => {
   const [board, setBoard] = useState<number[]>([]);
+  // Reset default grid size to 3x3
   const [gridSize, setGridSize] = useState<GridSize>({ rows: 3, cols: 3 });
   const [moves, setMoves] = useState(0);
-  const [requiredMoves, setRequiredMoves] = useState(0);
   const [seconds, setSeconds] = useState(0);
   const [imageUrl, setImageUrl] = useState(DEFAULT_IMAGE);
   const [difficulty, setDifficulty] = useState<Difficulty>('Easy');
@@ -41,14 +41,8 @@ const App: React.FC = () => {
 
   useEffect(() => { secondsRef.current = seconds; }, [seconds]);
 
-  // Sync Target moves with current path history
-  useEffect(() => {
-    if (hasShuffled) {
-      setRequiredMoves(history.length);
-    } else {
-      setRequiredMoves(0);
-    }
-  }, [history.length, hasShuffled]);
+  // Derive target moves directly for perfect synchronization
+  const currentTarget = useMemo(() => hasShuffled ? history.length : null, [hasShuffled, history.length]);
 
   const updateBestMoves = useCallback((size: GridSize) => {
     try {
@@ -73,11 +67,10 @@ const App: React.FC = () => {
     const newBoard = Array.from({ length: size.rows * size.cols }, (_, i) => i);
     setBoard(newBoard);
     setMoves(0);
-    setRequiredMoves(0);
     setSeconds(0);
     setHasShuffled(false);
     setHistory([]);
-    setUndoStack([]);
+    setUndoStack([]); // Clear undo on new board initialization
     setIsGameFinished(false);
     setClueTileIdx(null);
     setMovingTileIdx(null);
@@ -94,7 +87,6 @@ const App: React.FC = () => {
             const parsed = JSON.parse(lastData);
             setBoard(parsed.board);
             setMoves(parsed.moves);
-            setRequiredMoves(parsed.requiredMoves || 0);
             setSeconds(lastSeconds ? parseInt(lastSeconds, 10) : 0);
             setImageUrl(parsed.imageUrl || DEFAULT_IMAGE);
             setGridSize(parsed.gridSize);
@@ -125,12 +117,12 @@ const App: React.FC = () => {
   useEffect(() => {
     if (isInitialLoadDone.current && board.length > 0) {
       const stateToSave = { 
-        board, moves, requiredMoves, imageUrl, gridSize, 
+        board, moves, imageUrl, gridSize, 
         history, undoStack, difficulty, spacing, showNumbers, tileShape, hasShuffled 
       };
       try { localStorage.setItem('puzzle_current_state_data', JSON.stringify(stateToSave)); } catch (e) {}
     }
-  }, [board, moves, requiredMoves, imageUrl, gridSize, difficulty, spacing, showNumbers, tileShape, hasShuffled, history, undoStack]);
+  }, [board, moves, imageUrl, gridSize, difficulty, spacing, showNumbers, tileShape, hasShuffled, history, undoStack]);
 
   useEffect(() => {
     if (seconds > 0 && !isGameFinished) {
@@ -218,10 +210,9 @@ const App: React.FC = () => {
     }
     
     setHistory(newHistory);
-    setUndoStack([]); // Clear user undo stack on new game
+    setUndoStack([]); // Explicitly clear user undo stack on new shuffle
     setBoard(curr);
     setMoves(0);
-    setRequiredMoves(newHistory.length);
     setSeconds(0);
     setClueTileIdx(null);
     setHasShuffled(true);
@@ -326,7 +317,7 @@ const App: React.FC = () => {
   }, [gridSize, imageHistory]);
 
   return (
-    <div className="w-full h-full flex flex-col items-center justify-start overflow-y-auto overflow-x-hidden p-4 md:p-12">
+    <div className="w-full h-full flex flex-col items-center justify-start overflow-y-auto overflow-x-hidden pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))] pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] md:p-12">
       <div className="w-full max-w-[420px] mb-8 flex flex-col items-center">
         <div className="flex items-center justify-between w-full mb-8">
             <div className="flex items-center gap-2">
@@ -343,7 +334,7 @@ const App: React.FC = () => {
         <div className="grid grid-cols-4 w-full gap-2.5">
             {[
                 { label: 'Moves', val: moves, color: 'text-white' },
-                { label: 'Target', val: requiredMoves || '--', color: 'text-emerald-400' },
+                { label: 'Target', val: currentTarget !== null ? currentTarget : '--', color: 'text-emerald-400' },
                 { label: 'Best', val: bestMoves || '--', color: 'text-blue-400' },
                 { label: 'Time', val: `${Math.floor(seconds/60)}:${(seconds%60).toString().padStart(2,'0')}`, color: 'text-white' }
             ].map((stat, i) => (

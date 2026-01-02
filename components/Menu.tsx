@@ -102,7 +102,7 @@ const Menu: React.FC<MenuProps> = ({
   return (
     <div className="fixed inset-0 z-50 flex overflow-hidden">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={handleClose} />
-      <div className="relative w-80 h-full bg-slate-900 shadow-2xl p-6 flex flex-col gap-6 animate-menu border-r border-white/5 overflow-y-auto">
+      <div className="relative w-80 h-full bg-slate-900 shadow-2xl pt-[max(1.5rem,env(safe-area-inset-top))] pb-[max(1.5rem,env(safe-area-inset-bottom))] pl-[max(1.5rem,env(safe-area-inset-left))] pr-6 flex flex-col gap-6 animate-menu border-r border-white/5 overflow-y-auto">
         
         {activeSubView === 'instructions' ? renderInstructions() : 
          activeSubView === 'about' ? renderAbout() : (
