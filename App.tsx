@@ -318,10 +318,7 @@ const App: React.FC = () => {
 
   return (
     <div 
-      className="w-full h-full flex flex-col items-center justify-start overflow-y-auto overflow-x-hidden pb-[max(1rem,env(safe-area-inset-bottom))] pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] md:p-12"
-      style={{
-        paddingTop: 'calc(max(5rem, env(safe-area-inset-top)) + 2rem)'
-      }}
+      className="w-full h-full flex flex-col items-center justify-start overflow-y-auto overflow-x-hidden pt-[max(1.5rem,env(safe-area-inset-top))] pb-[max(1.5rem,env(safe-area-inset-bottom))] pl-[max(1.5rem,env(safe-area-inset-left))] pr-[max(1.5rem,env(safe-area-inset-right))] md:p-12"
     >
       <div className="w-full max-w-[420px] mb-8 flex flex-col items-center">
         <div className="flex items-center justify-between w-full mb-8">
