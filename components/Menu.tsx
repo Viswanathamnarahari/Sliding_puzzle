@@ -87,7 +87,7 @@ const Menu: React.FC<MenuProps> = ({
           <p className="text-blue-400 font-bold tracking-widest text-[10px] uppercase">For grand kids</p>
           <div className="w-8 h-px bg-slate-800 my-4" />
           <p className="text-slate-400 text-xs font-medium">Viswanatham@gmail.com</p>
-          <p className="text-slate-600 text-[10px] font-black tracking-[0.2em] mt-8 uppercase">260102.3</p>
+          <p className="text-slate-600 text-[10px] font-black tracking-[0.2em] mt-8 uppercase">260102.4</p>
       </div>
       
       <button 
@@ -236,14 +236,14 @@ const Menu: React.FC<MenuProps> = ({
                     onClick={() => setActiveSubView('about')}
                     className="w-full py-4 bg-slate-800 border border-white/5 text-slate-300 rounded-xl font-bold text-[9px] uppercase tracking-[0.2em] hover:bg-slate-750 transition-all flex items-center justify-center gap-2.5 group"
                 >
-                    <svg xmlns="http://www.getluna.com/icons/info" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-blue-400 group-hover:scale-110 transition-transform"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-blue-400 group-hover:scale-110 transition-transform"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
                     ABOUT
                 </button>
                 <button 
                     onClick={() => setActiveSubView('instructions')}
                     className="w-full py-4 bg-slate-800 border border-white/5 text-slate-300 rounded-xl font-bold text-[9px] uppercase tracking-[0.2em] hover:bg-slate-750 transition-all flex items-center justify-center gap-2.5 group"
                 >
-                    <svg xmlns="http://www.getluna.com/icons/help" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-blue-400 group-hover:scale-110 transition-transform"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-blue-400 group-hover:scale-110 transition-transform"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
                     HOW TO PLAY
                 </button>
             </section>

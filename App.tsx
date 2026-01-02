@@ -14,8 +14,8 @@ interface UndoStep {
 
 const App: React.FC = () => {
   const [board, setBoard] = useState<number[]>([]);
-  // Defaulting to 3x3 as requested
-  const [gridSize, setGridSize] = useState<GridSize>({ rows: 3, cols: 3 });
+  // Defaulting to 4x4 as requested for 15 pieces + 1 empty
+  const [gridSize, setGridSize] = useState<GridSize>({ rows: 4, cols: 4 });
   const [moves, setMoves] = useState(0);
   const [seconds, setSeconds] = useState(0);
   const [imageUrl, setImageUrl] = useState(DEFAULT_IMAGE);
@@ -46,7 +46,6 @@ const App: React.FC = () => {
 
   useEffect(() => { secondsRef.current = seconds; }, [seconds]);
 
-  // Derive target moves directly for perfect synchronization
   const currentTarget = useMemo(() => hasShuffled ? history.length : null, [hasShuffled, history.length]);
 
   const updateBestMoves = useCallback((size: GridSize) => {
@@ -104,8 +103,8 @@ const App: React.FC = () => {
             setHasShuffled(parsed.hasShuffled ?? false);
             updateBestMoves(parsed.gridSize);
             setIsGameFinished(isSolved(parsed.board) && parsed.hasShuffled && parsed.moves > 0);
-        } catch(e) { initBoard({ rows: 3, cols: 3 }); }
-    } else { initBoard({ rows: 3, cols: 3 }); }
+        } catch(e) { initBoard({ rows: 4, cols: 4 }); }
+    } else { initBoard({ rows: 4, cols: 4 }); }
   }, [initBoard, updateBestMoves]);
 
   useEffect(() => {
@@ -169,7 +168,6 @@ const App: React.FC = () => {
     const emptyIdx = board.indexOf(board.length - 1);
     if (!isAdjacent(index, emptyIdx, gridSize)) return;
 
-    // Snapshot current state for undo stack before making the move
     if (!silent) {
       setUndoStack(prev => [...prev, { board: [...board], history: [...history] }]);
     }
