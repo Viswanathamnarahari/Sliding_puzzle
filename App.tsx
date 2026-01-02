@@ -14,7 +14,7 @@ interface UndoStep {
 
 const App: React.FC = () => {
   const [board, setBoard] = useState<number[]>([]);
-  // Reset default grid size to 3x3
+  // Defaulting to 3x3 as requested
   const [gridSize, setGridSize] = useState<GridSize>({ rows: 3, cols: 3 });
   const [moves, setMoves] = useState(0);
   const [seconds, setSeconds] = useState(0);
@@ -70,7 +70,7 @@ const App: React.FC = () => {
     setSeconds(0);
     setHasShuffled(false);
     setHistory([]);
-    setUndoStack([]); // Clear undo on new board initialization
+    setUndoStack([]); 
     setIsGameFinished(false);
     setClueTileIdx(null);
     setMovingTileIdx(null);
@@ -210,7 +210,7 @@ const App: React.FC = () => {
     }
     
     setHistory(newHistory);
-    setUndoStack([]); // Explicitly clear user undo stack on new shuffle
+    setUndoStack([]); 
     setBoard(curr);
     setMoves(0);
     setSeconds(0);
@@ -317,7 +317,12 @@ const App: React.FC = () => {
   }, [gridSize, imageHistory]);
 
   return (
-    <div className="w-full h-full flex flex-col items-center justify-start overflow-y-auto overflow-x-hidden pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))] pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] md:p-12">
+    <div 
+      className="w-full h-full flex flex-col items-center justify-start overflow-y-auto overflow-x-hidden pb-[max(1rem,env(safe-area-inset-bottom))] pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] md:p-12"
+      style={{
+        paddingTop: 'calc(max(5rem, env(safe-area-inset-top)) + 2rem)'
+      }}
+    >
       <div className="w-full max-w-[420px] mb-8 flex flex-col items-center">
         <div className="flex items-center justify-between w-full mb-8">
             <div className="flex items-center gap-2">
