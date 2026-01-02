@@ -33,11 +33,16 @@ const App: React.FC = () => {
   const [hasShuffled, setHasShuffled] = useState(false);
   const [history, setHistory] = useState<number[][]>([]);
   const [undoStack, setUndoStack] = useState<UndoStep[]>([]);
+  const [isIOS, setIsIOS] = useState(false);
   
   const timerRef = useRef<number | null>(null);
   const secondsRef = useRef(0);
   const abortSolvingRef = useRef(false);
   const isInitialLoadDone = useRef(false);
+
+  useEffect(() => {
+    setIsIOS(/iPad|iPhone|iPod/.test(navigator.userAgent));
+  }, []);
 
   useEffect(() => { secondsRef.current = seconds; }, [seconds]);
 
@@ -318,7 +323,12 @@ const App: React.FC = () => {
 
   return (
     <div 
-      className="w-full h-full flex flex-col items-center justify-start overflow-y-auto overflow-x-hidden pt-[max(1.5rem,env(safe-area-inset-top))] pb-[max(1.5rem,env(safe-area-inset-bottom))] pl-[max(1.5rem,env(safe-area-inset-left))] pr-[max(1.5rem,env(safe-area-inset-right))] md:p-12"
+      className="w-full h-full flex flex-col items-center justify-start overflow-y-auto overflow-x-hidden pb-[max(1.5rem,env(safe-area-inset-bottom))] pl-[max(1.5rem,env(safe-area-inset-left))] pr-[max(1.5rem,env(safe-area-inset-right))] md:p-12"
+      style={{
+        paddingTop: isIOS 
+          ? 'calc(max(1.5rem, env(safe-area-inset-top)) + 1rem)' 
+          : 'max(1.5rem, env(safe-area-inset-top))'
+      }}
     >
       <div className="w-full max-w-[420px] mb-8 flex flex-col items-center">
         <div className="flex items-center justify-between w-full mb-8">
