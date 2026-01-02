@@ -41,7 +41,10 @@ const App: React.FC = () => {
   const isInitialLoadDone = useRef(false);
 
   useEffect(() => {
-    setIsIOS(/iPad|iPhone|iPod/.test(navigator.userAgent));
+    // Check for iOS platform specifically
+    const userAgent = window.navigator.userAgent.toLowerCase();
+    const isIOSDevice = /iphone|ipad|ipod/.test(userAgent);
+    setIsIOS(isIOSDevice);
   }, []);
 
   useEffect(() => { secondsRef.current = seconds; }, [seconds]);
@@ -323,6 +326,7 @@ const App: React.FC = () => {
     <div 
       className="w-full h-full flex flex-col items-center justify-start overflow-y-auto overflow-x-hidden pb-[max(1.5rem,env(safe-area-inset-bottom))] pl-[max(1.5rem,env(safe-area-inset-left))] pr-[max(1.5rem,env(safe-area-inset-right))] md:p-12"
       style={{
+        // On iOS, we add 0.75rem (half of the 1.5rem title size) extra padding
         paddingTop: isIOS 
           ? 'calc(max(1.5rem, env(safe-area-inset-top)) + 0.75rem)' 
           : 'max(1.5rem, env(safe-area-inset-top))'
