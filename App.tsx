@@ -14,7 +14,6 @@ interface UndoStep {
 
 const App: React.FC = () => {
   const [board, setBoard] = useState<number[]>([]);
-  // Defaulting to 4x4 as requested for 15 pieces + 1 empty
   const [gridSize, setGridSize] = useState<GridSize>({ rows: 4, cols: 4 });
   const [moves, setMoves] = useState(0);
   const [seconds, setSeconds] = useState(0);
@@ -28,6 +27,7 @@ const App: React.FC = () => {
   const [movingTileIdx, setMovingTileIdx] = useState<number | null>(null);
   const [clueTileIdx, setClueTileIdx] = useState<number | null>(null);
   const [isGameFinished, setIsGameFinished] = useState(false);
+  const [showShuffleAlert, setShowShuffleAlert] = useState(false);
   const [imageHistory, setImageHistory] = useState<string[]>([]);
   const [bestMoves, setBestMoves] = useState<number | null>(null);
   const [hasShuffled, setHasShuffled] = useState(false);
@@ -41,7 +41,6 @@ const App: React.FC = () => {
   const isInitialLoadDone = useRef(false);
 
   useEffect(() => {
-    // Check for iOS platform specifically
     const userAgent = window.navigator.userAgent.toLowerCase();
     const isIOSDevice = /iphone|ipad|ipod/.test(userAgent);
     setIsIOS(isIOSDevice);
@@ -79,6 +78,7 @@ const App: React.FC = () => {
     setHistory([]);
     setUndoStack([]); 
     setIsGameFinished(false);
+    setShowShuffleAlert(false);
     setClueTileIdx(null);
     setMovingTileIdx(null);
     setIsSolving(false);
@@ -96,7 +96,7 @@ const App: React.FC = () => {
             setMoves(parsed.moves);
             setSeconds(lastSeconds ? parseInt(lastSeconds, 10) : 0);
             setImageUrl(parsed.imageUrl || DEFAULT_IMAGE);
-            setGridSize(parsed.gridSize);
+            setGridSize(parsed.gridSize || { rows: 4, cols: 4 });
             setHistory(parsed.history || []);
             setUndoStack(parsed.undoStack || []);
             setDifficulty(parsed.difficulty || 'Easy');
@@ -104,7 +104,7 @@ const App: React.FC = () => {
             setShowNumbers(parsed.showNumbers ?? true);
             setTileShape(parsed.tileShape || 'square');
             setHasShuffled(parsed.hasShuffled ?? false);
-            updateBestMoves(parsed.gridSize);
+            updateBestMoves(parsed.gridSize || { rows: 4, cols: 4 });
             setIsGameFinished(isSolved(parsed.board) && parsed.hasShuffled && parsed.moves > 0);
         } catch(e) { initBoard({ rows: 4, cols: 4 }); }
     } else { initBoard({ rows: 4, cols: 4 }); }
@@ -166,7 +166,13 @@ const App: React.FC = () => {
   }, [updateBestMoves]);
 
   const handleMove = useCallback((index: number, silent = false) => {
-    if (isSolving && !silent) return;
+    if (!silent) {
+      if (!hasShuffled) {
+        setShowShuffleAlert(true);
+        return;
+      }
+      if (isSolving) return;
+    }
 
     const emptyIdx = board.indexOf(board.length - 1);
     if (!isAdjacent(index, emptyIdx, gridSize)) return;
@@ -201,6 +207,7 @@ const App: React.FC = () => {
   const shuffle = useCallback(() => {
     if (isSolving) return;
     setIsGameFinished(false);
+    setShowShuffleAlert(false);
     let curr = Array.from({ length: gridSize.rows * gridSize.cols }, (_, i) => i);
     const shuffleCount = difficulty === 'Easy' ? 20 : difficulty === 'Medium' ? 50 : 150;
     let lastEmpty = -1;
@@ -237,7 +244,15 @@ const App: React.FC = () => {
   }, [isSolving, undoStack]);
 
   const getClue = useCallback(() => {
-    if (isSolving || isGameFinished || !hasShuffled || history.length === 0) return;
+    if (isSolving || isGameFinished) return;
+    
+    if (!hasShuffled) {
+      setShowShuffleAlert(true);
+      return;
+    }
+    
+    if (history.length === 0) return;
+    
     const previousState = history[history.length - 1];
     const emptyIdxInPrevious = previousState.indexOf(board.length - 1);
     setClueTileIdx(emptyIdxInPrevious);
@@ -245,7 +260,13 @@ const App: React.FC = () => {
 
   const solve = useCallback(async () => {
     if (isSolving) { abortSolvingRef.current = true; return; }
-    if (isSolved(board) || !hasShuffled) return;
+    
+    if (!hasShuffled) {
+      setShowShuffleAlert(true);
+      return;
+    }
+
+    if (isSolved(board)) return;
     
     setIsSolving(true);
     abortSolvingRef.current = false;
@@ -309,6 +330,7 @@ const App: React.FC = () => {
               try {
                 const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
                 setImageUrl(dataUrl);
+                initBoard(gridSize);
                 const updated = [dataUrl, ...imageHistory.filter(x => x !== dataUrl)].slice(0, 5);
                 setImageHistory(updated);
                 localStorage.setItem('puzzle_image_history', JSON.stringify(updated));
@@ -320,13 +342,17 @@ const App: React.FC = () => {
       reader.readAsDataURL(file);
     }
     e.target.value = '';
-  }, [gridSize, imageHistory]);
+  }, [gridSize, imageHistory, initBoard]);
+
+  const handleSelectHistoryImage = useCallback((url: string) => {
+    setImageUrl(url);
+    initBoard(gridSize);
+  }, [initBoard, gridSize]);
 
   return (
     <div 
       className="w-full h-full flex flex-col items-center justify-start overflow-y-auto overflow-x-hidden pb-[max(1.5rem,env(safe-area-inset-bottom))] pl-[max(1.5rem,env(safe-area-inset-left))] pr-[max(1.5rem,env(safe-area-inset-right))] md:p-12"
       style={{
-        // On iOS, we add 0.75rem (half of the 1.5rem title size) extra padding
         paddingTop: isIOS 
           ? 'calc(max(1.5rem, env(safe-area-inset-top)) + 0.75rem)' 
           : 'max(1.5rem, env(safe-area-inset-top))'
@@ -335,8 +361,12 @@ const App: React.FC = () => {
       <div className="w-full max-w-[420px] mb-8 flex flex-col items-center">
         <div className="flex items-center justify-between w-full mb-8">
             <div className="flex items-center gap-2">
-                <button onClick={() => setIsMenuOpen(true)} className="p-3.5 rounded-2xl bg-white/5 border border-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition-all shadow-xl active:scale-90"><svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg></button>
-                <label className="p-3.5 rounded-2xl bg-white/5 border border-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition-all shadow-xl active:scale-90 cursor-pointer"><svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg><input type="file" accept="image/*" onChange={pickImage} className="hidden" /></label>
+                <button onClick={() => setIsMenuOpen(true)} className="p-3.5 rounded-2xl bg-white/5 border border-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition-all shadow-xl active:scale-90 relative">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>
+                </button>
+                <button onClick={() => setIsMenuOpen(true)} className="p-3.5 rounded-2xl bg-white/5 border border-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition-all shadow-xl active:scale-90 cursor-pointer">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
+                </button>
             </div>
             <h1 className="text-2xl font-black text-white/95 tracking-tighter uppercase flex items-center gap-2"><span className="opacity-30">R3AL</span><span className="text-blue-500 drop-shadow-[0_0_12px_rgba(59,130,246,0.4)]">PUZZLE</span></h1>
             <div className="flex items-center">
@@ -359,12 +389,34 @@ const App: React.FC = () => {
             ))}
         </div>
       </div>
-      <div className="flex items-center justify-center mb-10">
+
+      <div className="flex items-center justify-center mb-10 relative">
           <PuzzleBoard board={board} gridSize={gridSize} imageUrl={imageUrl} onTileClick={handleMove} spacing={spacing} movingTileIdx={movingTileIdx} clueTileIdx={clueTileIdx} showNumbers={showNumbers} tileShape={tileShape} />
+          
+          {showShuffleAlert && (
+            <div className="absolute inset-0 z-[90] flex items-center justify-center bg-black/80 backdrop-blur-md rounded-3xl animate-pop p-6">
+                <div className="bg-slate-900 border border-slate-700/50 p-6 rounded-[2rem] shadow-2xl text-center w-full max-w-[280px] relative overflow-hidden">
+                    <div className="absolute top-0 left-0 w-full h-1 bg-amber-500" />
+                    <div className="w-12 h-12 bg-amber-500/10 rounded-full flex items-center justify-center mx-auto mb-4 border border-amber-500/30">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m21 16-4 4-4-4"/><path d="M17 20V4"/><path d="m3 8 4-4 4 4"/><path d="M7 4v16"/></svg>
+                    </div>
+                    <h2 className="text-lg font-black mb-1.5 text-white uppercase tracking-tighter">Shuffle Required</h2>
+                    <p className="text-slate-400 text-[9px] mb-6 font-medium leading-relaxed uppercase tracking-wider">The matrix is currently stagnant. Hit the shuffle button to begin your mission.</p>
+                    <button 
+                        onClick={() => setShowShuffleAlert(false)} 
+                        className="w-full py-3.5 bg-amber-500 hover:bg-amber-400 rounded-xl font-black text-[9px] tracking-[0.2em] transition-all shadow-xl active:scale-95 text-white uppercase"
+                    >
+                        Continue
+                    </button>
+                </div>
+            </div>
+          )}
       </div>
+
       <div className="w-full max-w-[420px] pb-12">
           <Controls onShuffle={shuffle} onSolve={solve} onClue={getClue} onUndo={undo} isSolving={isSolving} canUndo={!isSolving && undoStack.length > 0} />
       </div>
+
       {isGameFinished && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/95 backdrop-blur-xl p-6">
             <div className="bg-slate-900 border border-slate-700/50 p-10 rounded-[3rem] shadow-2xl text-center w-full max-w-sm animate-pop relative overflow-hidden">
@@ -377,12 +429,29 @@ const App: React.FC = () => {
                 <div className="flex flex-col gap-3">
                     <button onClick={shuffle} className="w-full py-5 bg-blue-600 hover:bg-blue-500 rounded-2xl font-black text-[10px] tracking-[0.2em] transition-all shadow-xl active:scale-95 text-white">RESTART MATRIX</button>
                     <button onClick={() => setIsGameFinished(false)} className="w-full py-5 bg-slate-800 hover:bg-slate-750 rounded-2xl font-bold text-[10px] text-slate-400 tracking-[0.2em] transition-all active:scale-95 uppercase">Dismiss</button>
-                    <p className="text-[9px] text-slate-500 font-medium tracking-tight mt-2 opacity-50">viswanatham@gmail.com</p>
                 </div>
             </div>
         </div>
       )}
-      <Menu isOpen={isMenuOpen} onClose={() => setIsMenuOpen(false)} gridSize={gridSize} setGridSize={(s) => { setGridSize(s); initBoard(s); }} difficulty={difficulty} setDifficulty={setDifficulty} spacing={spacing} setSpacing={setSpacing} showNumbers={showNumbers} setShowNumbers={setShowNumbers} tileShape={tileShape} setTileShape={setTileShape} imageHistory={imageHistory} onSelectHistoryImage={setImageUrl} onPickImage={pickImage} onLoadSaved={loadSavedState} />
+
+      <Menu 
+        isOpen={isMenuOpen} 
+        onClose={() => setIsMenuOpen(false)} 
+        gridSize={gridSize} 
+        setGridSize={(s) => { setGridSize(s); initBoard(s); }} 
+        difficulty={difficulty} 
+        setDifficulty={setDifficulty} 
+        spacing={spacing} 
+        setSpacing={setSpacing} 
+        showNumbers={showNumbers} 
+        setShowNumbers={setShowNumbers} 
+        tileShape={tileShape} 
+        setTileShape={setTileShape} 
+        imageHistory={imageHistory} 
+        onSelectHistoryImage={handleSelectHistoryImage} 
+        onPickImage={pickImage} 
+        onLoadSaved={loadSavedState}
+      />
     </div>
   );
 };

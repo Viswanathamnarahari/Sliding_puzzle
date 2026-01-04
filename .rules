@@ -1,8 +1,9 @@
-Version Control: Always update the version string in Menu.tsx using the YYMMDD.I format (e.g., 251219.1).
-YY : current year
-MM: Current month of year
-DD: Current day of month
-I  : Iteration for the day.
-Do not update Version string till further instructions. Update only when specifically asked.
+
+
+Version Logic: useMemo hook to ensure the signature always pulls the current two-digit year, month, and day from the system clock.
+ Version should be YY.MM.DD-B, B is the build version for the day. Not the run version. Whenever there is a code change, in any file,
+  update the Version in about section of the application.
 
 General: For working specs or logic, Do not change any file without letting me know.
+
+Grid Size :  3 X 3 (default), 4 x 4, 5 X 5

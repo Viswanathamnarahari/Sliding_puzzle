@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { GridSize, Difficulty, StatsEntry, TileShape } from '../types';
 
 interface MenuProps {
@@ -26,6 +26,16 @@ const Menu: React.FC<MenuProps> = ({
   imageHistory, onSelectHistoryImage, onPickImage, onLoadSaved
 }) => {
   const [activeSubView, setActiveSubView] = useState<'main' | 'instructions' | 'about'>('main');
+  const [isUploadExpanded, setIsUploadExpanded] = useState(false);
+
+  const version = useMemo(() => {
+    const now = new Date();
+    const yy = String(now.getFullYear()).slice(-2);
+    const mm = String(now.getMonth() + 1).padStart(2, '0');
+    const dd = String(now.getDate()).padStart(2, '0');
+    const build = "5"; 
+    return `${yy}.${mm}.${dd}-${build}`;
+  }, []);
 
   if (!isOpen) return null;
 
@@ -34,6 +44,7 @@ const Menu: React.FC<MenuProps> = ({
 
   const handleClose = () => {
     setActiveSubView('main');
+    setIsUploadExpanded(false);
     onClose();
   };
 
@@ -53,9 +64,8 @@ const Menu: React.FC<MenuProps> = ({
           <p><span className="text-blue-400 font-black block mb-1 uppercase tracking-wider">01. START</span> Hit <span className="text-white font-bold">Shuffle</span> to scramble the tiles. The timer and move counter begin on your first move.</p>
           <p><span className="text-blue-400 font-black block mb-1 uppercase tracking-wider">02. NAVIGATION</span> Tap tiles next to the empty space to move them. Toggle <span className="text-white font-bold">Show Numbers</span> if the image is too difficult.</p>
           <p><span className="text-blue-400 font-black block mb-1 uppercase tracking-wider">03. PERSONALIZE</span> Change <span className="text-white font-bold">Tile Spacing</span> for a cleaner look or switch between <span className="text-white font-bold">Square</span> and <span className="text-white font-bold">Rounded</span> tile shapes.</p>
-          <p><span className="text-blue-400 font-black block mb-1 uppercase tracking-wider">04. DATA PERSISTENCE</span> Your state is auto-cached. Use <span className="text-white font-bold">"Load Saved State"</span> to resume a previous session if you close the app.</p>
-          <p><span className="text-blue-400 font-black block mb-1 uppercase tracking-wider">05. DIFFICULTY</span> Adjust complexity levels (Easy/Medium/Hard) to change the initial number of shuffles.</p>
-          <p><span className="text-blue-400 font-black block mb-1 uppercase tracking-wider">06. HALL OF FAME</span> Your lowest move counts are saved locally for each grid size. Try to beat your best!</p>
+          <p><span className="text-blue-400 font-black block mb-1 uppercase tracking-wider">04. MATRIX</span> Choose your grid size (3x3, 4x4, 5x5) to adjust the difficulty level.</p>
+          <p><span className="text-blue-400 font-black block mb-1 uppercase tracking-wider">05. HALL OF FAME</span> Your lowest move counts are saved locally for each grid size. Try to beat your best!</p>
       </div>
       
       <button 
@@ -87,7 +97,7 @@ const Menu: React.FC<MenuProps> = ({
           <p className="text-blue-400 font-bold tracking-widest text-[10px] uppercase">For grand kids</p>
           <div className="w-8 h-px bg-slate-800 my-4" />
           <p className="text-slate-400 text-xs font-medium">Viswanatham@gmail.com</p>
-          <p className="text-slate-600 text-[10px] font-black tracking-[0.2em] mt-8 uppercase">260102.4</p>
+          <p className="text-slate-600 text-[10px] font-black tracking-[0.2em] mt-8 uppercase">{version}</p>
       </div>
       
       <button 
@@ -108,47 +118,74 @@ const Menu: React.FC<MenuProps> = ({
          activeSubView === 'about' ? renderAbout() : (
           <>
             <div className="flex items-center justify-between">
-                <h2 className="text-xl font-black tracking-tighter text-white">GAME MENU</h2>
+                <h2 className="text-xl font-black tracking-tighter text-white uppercase">Game Menu</h2>
                 <button onClick={handleClose} className="p-2 hover:bg-slate-800 rounded-lg text-slate-400">
                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                 </button>
             </div>
 
-            {/* Persistence Actions */}
-            <section>
-                <button 
-                    onClick={() => { onLoadSaved(); handleClose(); }}
-                    className="w-full py-4 bg-blue-600/20 border border-blue-500/30 text-blue-400 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-blue-600/30 transition-all active:scale-95"
-                >
-                    LOAD SAVED STATE
+            <div className="grid grid-cols-1 gap-2">
+                <button onClick={() => setActiveSubView('instructions')} className="flex items-center justify-between p-4 bg-slate-800/40 hover:bg-slate-800 rounded-2xl border border-white/5 group transition-all">
+                    <span className="text-xs font-black text-slate-300 uppercase tracking-tight">How to play</span>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-slate-600 group-hover:text-blue-400 transition-colors"><path d="m9 18 6-6-6-6"/></svg>
                 </button>
+                <button onClick={() => setActiveSubView('about')} className="flex items-center justify-between p-4 bg-slate-800/40 hover:bg-slate-800 rounded-2xl border border-white/5 group transition-all">
+                    <span className="text-xs font-black text-slate-300 uppercase tracking-tight">About game</span>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-slate-600 group-hover:text-blue-400 transition-colors"><path d="m9 18 6-6-6-6"/></svg>
+                </button>
+            </div>
+
+            <section className="bg-slate-800/20 p-4 rounded-3xl border border-white/5 flex flex-col gap-4">
+                <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">Pick a Picture</h3>
+                
+                <div className="flex flex-col gap-3">
+                    <button 
+                        onClick={() => setIsUploadExpanded(!isUploadExpanded)}
+                        className={`flex items-center justify-center gap-3 w-full py-4 rounded-2xl font-black text-[10px] tracking-widest uppercase transition-all active:scale-95 shadow-lg border ${
+                            isUploadExpanded 
+                            ? 'bg-blue-600 border-blue-400 text-white' 
+                            : 'bg-slate-800 border-slate-700 text-slate-400'
+                        }`}
+                    >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                        Gallery Upload
+                    </button>
+
+                    {isUploadExpanded && (
+                        <div className="grid grid-cols-2 gap-3 animate-pop">
+                            <label className="flex flex-col items-center justify-center gap-2 py-5 bg-slate-800 border border-slate-700 rounded-2xl hover:bg-slate-750 transition-all cursor-pointer group active:scale-95">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-slate-500 group-hover:text-blue-400 transition-colors"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                                <span className="text-[9px] text-slate-400 font-black tracking-widest uppercase">Camera</span>
+                                <input type="file" accept="image/*" capture="environment" onChange={(e) => { onPickImage(e); handleClose(); }} className="hidden" />
+                            </label>
+                            <label className="flex flex-col items-center justify-center gap-2 py-5 bg-slate-800 border border-slate-700 rounded-2xl hover:bg-slate-750 transition-all cursor-pointer group active:scale-95">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-slate-500 group-hover:text-blue-400 transition-colors"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
+                                <span className="text-[9px] text-slate-400 font-black tracking-widest uppercase">Browse</span>
+                                <input type="file" accept="image/*" onChange={(e) => { onPickImage(e); handleClose(); }} className="hidden" />
+                            </label>
+                        </div>
+                    )}
+
+                    {imageHistory.length > 0 && (
+                        <div className="flex flex-col gap-2 mt-2">
+                            <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest ml-1">Recent Pictures</span>
+                            <div className="flex gap-2.5 overflow-x-auto pb-1 scrollbar-hide">
+                                {imageHistory.map((url, i) => (
+                                    <button 
+                                        key={i} 
+                                        onClick={() => { onSelectHistoryImage(url); handleClose(); }}
+                                        className="flex-shrink-0 w-14 h-14 rounded-xl bg-cover bg-center border border-slate-700 active:scale-90 transition-all hover:border-blue-500 shadow-xl"
+                                        style={{ backgroundImage: `url(${url})` }}
+                                    />
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                </div>
             </section>
 
-            {/* Pick Picture */}
-            <section>
-                <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em] mb-3">PICK PICTURE</h3>
-                <label className="flex flex-col items-center justify-center w-full h-20 bg-slate-800 border-2 border-slate-700 border-dashed rounded-2xl hover:bg-slate-750 transition-all cursor-pointer group mb-4 active:scale-95">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mb-2 text-slate-500 group-hover:text-blue-400"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-                    <span className="text-xs text-slate-400 font-black group-hover:text-blue-400 tracking-tighter uppercase">Gallery Upload</span>
-                    <input type="file" accept="image/*" onChange={(e) => { onPickImage(e); handleClose(); }} className="hidden" />
-                </label>
-                {imageHistory.length > 0 && (
-                    <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
-                        {imageHistory.map((url, i) => (
-                            <button 
-                                key={i} 
-                                onClick={() => { onSelectHistoryImage(url); handleClose(); }}
-                                className="flex-shrink-0 w-12 h-12 rounded-lg bg-cover bg-center border-2 border-slate-700 active:scale-90 transition-all hover:border-blue-500"
-                                style={{ backgroundImage: `url(${url})` }}
-                            />
-                        ))}
-                    </div>
-                )}
-            </section>
-
-            {/* Toggles */}
             <section className="flex items-center justify-between p-4 bg-slate-800/50 rounded-2xl border border-white/5">
-                <span className="text-xs font-black text-slate-300 tracking-tight uppercase">SHOW NUMBERS</span>
+                <span className="text-xs font-black text-slate-300 tracking-tight uppercase">Show Numbers</span>
                 <button 
                     onClick={() => setShowNumbers(!showNumbers)}
                     className={`relative w-12 h-6 rounded-full transition-colors ${showNumbers ? 'bg-blue-600' : 'bg-slate-700'}`}
@@ -157,9 +194,27 @@ const Menu: React.FC<MenuProps> = ({
                 </button>
             </section>
 
-            {/* Tile Shape Selection */}
             <section>
-                <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em] mb-3">TILE SHAPE</h3>
+                <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em] mb-3">Matrix Size</h3>
+                <div className="grid grid-cols-3 gap-2">
+                    {[3, 4, 5].map(size => (
+                        <button 
+                            key={size} 
+                            onClick={() => setGridSize({ rows: size, cols: size })}
+                            className={`py-3 rounded-xl text-[10px] font-black transition-all border uppercase tracking-widest ${
+                                gridSize.rows === size 
+                                ? 'bg-blue-600 border-blue-400 text-white shadow-lg' 
+                                : 'bg-slate-800 border-white/5 text-slate-400'
+                            }`}
+                        >
+                            {size}X{size}
+                        </button>
+                    ))}
+                </div>
+            </section>
+
+            <section>
+                <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em] mb-3">Tile Shape</h3>
                 <div className="flex gap-2">
                     {(['square', 'rounded'] as TileShape[]).map(s => (
                         <button 
@@ -177,80 +232,17 @@ const Menu: React.FC<MenuProps> = ({
                 </div>
             </section>
 
-            {/* Grid Selection */}
             <section>
-                <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em] mb-3">SELECT GRID</h3>
-                <div className="grid grid-cols-3 gap-2">
-                    {[ {r:3, c:3}, {r:4, c:4}, {r:5, c:5} ].map((g, i) => (
-                        <button 
-                            key={i} 
-                            onClick={() => { setGridSize({rows: g.r, cols: g.c}); handleClose(); }}
-                            className={`py-3 rounded-xl text-xs font-bold transition-all border ${
-                                gridSize.rows === g.r && gridSize.cols === g.c 
-                                ? 'bg-blue-600 border-blue-400 text-white shadow-lg' 
-                                : 'bg-slate-800 border-white/5 text-slate-400'
-                            }`}
-                        >
-                            {g.r}x{g.c}
-                        </button>
-                    ))}
-                </div>
-            </section>
-
-            {/* Difficulty Setting */}
-            <section>
-                <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em] mb-3">DIFFICULTY</h3>
-                <div className="flex gap-2">
-                    {(['Easy', 'Medium', 'Hard'] as Difficulty[]).map(d => (
-                        <button 
-                            key={d} 
-                            onClick={() => setDifficulty(d)}
-                            className={`flex-1 py-3 rounded-xl text-xs font-bold transition-all border uppercase tracking-widest ${
-                                difficulty === d 
-                                ? 'bg-indigo-600 border-indigo-400 text-white shadow-lg' 
-                                : 'bg-slate-800 border-white/5 text-slate-400'
-                            }`}
-                        >
-                            {d}
-                        </button>
-                    ))}
-                </div>
-            </section>
-
-            {/* Spacing Setting */}
-            <section>
-                <div className="flex justify-between items-center mb-2">
-                    <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">TILE SPACING</h3>
-                    <span className="text-xs font-bold text-blue-400">{spacing}px</span>
-                </div>
-                <input 
-                    type="range" min="0" max="10" value={spacing} 
-                    onChange={(e) => setSpacing(parseInt(e.target.value))}
-                    className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-blue-500"
-                />
-            </section>
-
-            {/* Footer Menu Actions */}
-            <section className="pt-2 flex flex-col gap-2">
                 <button 
-                    onClick={() => setActiveSubView('about')}
-                    className="w-full py-4 bg-slate-800 border border-white/5 text-slate-300 rounded-xl font-bold text-[9px] uppercase tracking-[0.2em] hover:bg-slate-750 transition-all flex items-center justify-center gap-2.5 group"
+                    onClick={() => { onLoadSaved(); handleClose(); }}
+                    className="w-full py-4 bg-blue-600/20 border border-blue-500/30 text-blue-400 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-blue-600/30 transition-all active:scale-95"
                 >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-blue-400 group-hover:scale-110 transition-transform"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
-                    ABOUT
-                </button>
-                <button 
-                    onClick={() => setActiveSubView('instructions')}
-                    className="w-full py-4 bg-slate-800 border border-white/5 text-slate-300 rounded-xl font-bold text-[9px] uppercase tracking-[0.2em] hover:bg-slate-750 transition-all flex items-center justify-center gap-2.5 group"
-                >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-blue-400 group-hover:scale-110 transition-transform"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-                    HOW TO PLAY
+                    Load Saved State
                 </button>
             </section>
 
-            {/* Stats Display */}
             <section className="mt-auto border-t border-white/5 pt-6 pb-4">
-                <h3 className="text-[10px] font-bold text-blue-400 uppercase tracking-[0.2em] mb-4">HALL OF FAME</h3>
+                <h3 className="text-[10px] font-bold text-blue-400 uppercase tracking-[0.2em] mb-4">Hall of Fame</h3>
                 <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
                     {bestStats.length === 0 ? (
                         <p className="text-[10px] text-slate-600 italic text-center py-4">No records yet. Win a game to show up here!</p>
@@ -258,11 +250,11 @@ const Menu: React.FC<MenuProps> = ({
                         bestStats.map((s, i) => (
                             <div key={i} className="flex justify-between items-center bg-slate-800/40 p-3 rounded-xl text-[10px] border border-white/5">
                                 <div className="flex flex-col">
-                                    <span className="font-bold text-slate-300 uppercase">{s.gridSize} GRID</span>
+                                    <span className="font-bold text-slate-300 uppercase">{s.gridSize} Grid</span>
                                     <span className="text-slate-600 uppercase">{s.date}</span>
                                 </div>
                                 <div className="text-right">
-                                    <div className="text-blue-400 font-black uppercase">{s.moves} MOVES</div>
+                                    <div className="text-blue-400 font-black uppercase">{s.moves} Moves</div>
                                     <div className="text-slate-500 uppercase">{s.time}S</div>
                                 </div>
                             </div>
