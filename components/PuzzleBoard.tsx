@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { GridSize, TileShape } from '../types';
+import { GridSize, TileShape, NumberSize } from '../types';
 
 interface PuzzleBoardProps {
   board: number[];
@@ -11,10 +11,11 @@ interface PuzzleBoardProps {
   clueTileIdx: number | null;
   showNumbers: boolean;
   tileShape: TileShape;
+  numberSize: NumberSize;
 }
 
 const PuzzleBoard: React.FC<PuzzleBoardProps> = React.memo(({ 
-  board, gridSize, imageUrl, onTileClick, spacing, movingTileIdx, clueTileIdx, showNumbers, tileShape 
+  board, gridSize, imageUrl, onTileClick, spacing, movingTileIdx, clueTileIdx, showNumbers, tileShape, numberSize 
 }) => {
   const [dimensions, setDimensions] = useState({ width: 300, height: 300 });
 
@@ -46,28 +47,48 @@ const PuzzleBoard: React.FC<PuzzleBoardProps> = React.memo(({
   const borderRadius = tileShape === 'rounded' ? '12px' : '0px';
 
   return (
-    <div 
-      className="relative select-none"
-      style={{ 
-        width: Math.round(boardWidth), 
-        height: Math.round(boardHeight),
-        perspective: '1200px',
-        transformStyle: 'preserve-3d',
-        touchAction: 'none'
-      }}
-    >
+    <div className={`p-1.5 border-2 border-white/20 bg-[#0a0a0c]/50 ${tileShape === 'rounded' ? 'rounded-[1.5rem]' : 'rounded-xl'}`}>
+      <div 
+        className="relative select-none"
+        style={{ 
+          width: Math.round(boardWidth), 
+          height: Math.round(boardHeight),
+          perspective: '1200px',
+          transformStyle: 'preserve-3d',
+          touchAction: 'none'
+        }}
+      >
       {board.map((val, idx) => {
-        if (val === board.length - 1) return null;
-
         const row = Math.floor(idx / gridSize.cols);
         const col = idx % gridSize.cols;
-        const origRow = Math.floor(val / gridSize.cols);
-        const origCol = val % gridSize.cols;
-        
-        // Use Math.round to force integer pixel positions and prevent sub-pixel jitters/blinking on Android
         const left = Math.round(col * (tileW + spacing));
         const top = Math.round(row * (tileH + spacing));
 
+        if (val === board.length - 1) {
+          return (
+            <div
+              key="empty"
+              className="absolute flex items-center justify-center pointer-events-none overflow-hidden"
+              style={{
+                width: Math.round(tileW),
+                height: Math.round(tileH),
+                transform: `translate3d(${left}px, ${top}px, 0)`,
+                borderRadius: borderRadius,
+                background: 'rgba(255, 255, 255, 0.05)',
+              }}
+            >
+              <div className="relative w-full h-full flex items-center justify-center">
+                {/* Bright Large X */}
+                <div className="absolute w-[85%] h-[3px] bg-white/40 rotate-45 rounded-full shadow-[0_0_12px_rgba(255,255,255,0.3)]" />
+                <div className="absolute w-[85%] h-[3px] bg-white/40 -rotate-45 rounded-full shadow-[0_0_12px_rgba(255,255,255,0.3)]" />
+              </div>
+            </div>
+          );
+        }
+
+        const origRow = Math.floor(val / gridSize.cols);
+        const origCol = val % gridSize.cols;
+        
         const isMoving = movingTileIdx === idx;
         const isClue = clueTileIdx === idx;
         const bgX = gridSize.cols > 1 ? (origCol / (gridSize.cols - 1)) * 100 : 0;
@@ -77,7 +98,7 @@ const PuzzleBoard: React.FC<PuzzleBoardProps> = React.memo(({
           <div
             key={val}
             onClick={() => onTileClick(idx)}
-            className="absolute puzzle-tile-transition cursor-pointer overflow-hidden border border-white/10 shadow-lg group active:brightness-125 touch-manipulation"
+            className="absolute puzzle-tile-transition cursor-pointer overflow-hidden border border-white/20 shadow-lg group active:brightness-125 touch-manipulation"
             style={{
               width: Math.round(tileW),
               height: Math.round(tileH),
@@ -93,7 +114,7 @@ const PuzzleBoard: React.FC<PuzzleBoardProps> = React.memo(({
           >
             {showNumbers && (
               <div className="absolute top-1.5 left-1.5 bg-black/60 backdrop-blur-md rounded-md px-1.5 py-0.5 min-w-[1.2rem] text-center border border-white/10 pointer-events-none">
-                <span className="text-[10px] font-black text-white/90">{val + 1}</span>
+                <span className={`${numberSize === 'Big' ? 'text-[14px]' : 'text-[10px]'} font-black text-white/95`}>{val + 1}</span>
               </div>
             )}
             {isClue && (
@@ -110,6 +131,7 @@ const PuzzleBoard: React.FC<PuzzleBoardProps> = React.memo(({
           </div>
         );
       })}
+      </div>
     </div>
   );
 });

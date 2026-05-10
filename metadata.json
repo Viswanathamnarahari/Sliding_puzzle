@@ -3,5 +3,6 @@
   "description": "An advanced sliding puzzle game with custom image support, multiple grid sizes, automated solving, and game state persistence.",
   "requestFramePermissions": [
     "camera"
-  ]
+  ],
+  "majorCapabilities": []
 }

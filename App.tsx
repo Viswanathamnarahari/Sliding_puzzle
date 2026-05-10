@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { GridSize, Difficulty, StatsEntry, TileShape } from './types';
+import { GridSize, Difficulty, StatsEntry, TileShape, NumberSize } from './types';
 import { isAdjacent, getMovableIndices, isSolved } from './services/puzzleLogic';
 import PuzzleBoard from './components/PuzzleBoard';
 import Controls from './components/Controls';
 import Menu from './components/Menu';
 
-const DEFAULT_IMAGE = 'https://picsum.photos/id/237/800/800';
+const DEFAULT_IMAGE = 'https://picsum.photos/id/1025/800/800';
 
 interface UndoStep {
   board: number[];
@@ -14,7 +14,7 @@ interface UndoStep {
 
 const App: React.FC = () => {
   const [board, setBoard] = useState<number[]>([]);
-  const [gridSize, setGridSize] = useState<GridSize>({ rows: 4, cols: 4 });
+  const [gridSize, setGridSize] = useState<GridSize>({ rows: 3, cols: 3 });
   const [moves, setMoves] = useState(0);
   const [seconds, setSeconds] = useState(0);
   const [imageUrl, setImageUrl] = useState(DEFAULT_IMAGE);
@@ -22,6 +22,7 @@ const App: React.FC = () => {
   const [spacing, setSpacing] = useState(2);
   const [showNumbers, setShowNumbers] = useState(true);
   const [tileShape, setTileShape] = useState<TileShape>('square');
+  const [numberSize, setNumberSize] = useState<NumberSize>('Big');
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isSolving, setIsSolving] = useState(false);
   const [movingTileIdx, setMovingTileIdx] = useState<number | null>(null);
@@ -96,18 +97,19 @@ const App: React.FC = () => {
             setMoves(parsed.moves);
             setSeconds(lastSeconds ? parseInt(lastSeconds, 10) : 0);
             setImageUrl(parsed.imageUrl || DEFAULT_IMAGE);
-            setGridSize(parsed.gridSize || { rows: 4, cols: 4 });
+            setGridSize(parsed.gridSize || { rows: 3, cols: 3 });
             setHistory(parsed.history || []);
             setUndoStack(parsed.undoStack || []);
             setDifficulty(parsed.difficulty || 'Easy');
             setSpacing(parsed.spacing || 2);
             setShowNumbers(parsed.showNumbers ?? true);
             setTileShape(parsed.tileShape || 'square');
+            setNumberSize(parsed.numberSize || 'Big');
             setHasShuffled(parsed.hasShuffled ?? false);
-            updateBestMoves(parsed.gridSize || { rows: 4, cols: 4 });
+            updateBestMoves(parsed.gridSize || { rows: 3, cols: 3 });
             setIsGameFinished(isSolved(parsed.board) && parsed.hasShuffled && parsed.moves > 0);
-        } catch(e) { initBoard({ rows: 4, cols: 4 }); }
-    } else { initBoard({ rows: 4, cols: 4 }); }
+        } catch(e) { initBoard({ rows: 3, cols: 3 }); }
+    } else { initBoard({ rows: 3, cols: 3 }); }
   }, [initBoard, updateBestMoves]);
 
   useEffect(() => {
@@ -125,7 +127,7 @@ const App: React.FC = () => {
     if (isInitialLoadDone.current && board.length > 0) {
       const stateToSave = { 
         board, moves, imageUrl, gridSize, 
-        history, undoStack, difficulty, spacing, showNumbers, tileShape, hasShuffled 
+        history, undoStack, difficulty, spacing, showNumbers, tileShape, numberSize, hasShuffled 
       };
       try { localStorage.setItem('puzzle_current_state_data', JSON.stringify(stateToSave)); } catch (e) {}
     }
@@ -351,15 +353,15 @@ const App: React.FC = () => {
 
   return (
     <div 
-      className="w-full h-full flex flex-col items-center justify-start overflow-y-auto overflow-x-hidden pb-[max(1.5rem,env(safe-area-inset-bottom))] pl-[max(1.5rem,env(safe-area-inset-left))] pr-[max(1.5rem,env(safe-area-inset-right))] md:p-12"
+      className="w-full h-full flex flex-col items-center justify-start overflow-hidden pb-[max(1rem,env(safe-area-inset-bottom))] pl-[max(1.5rem,env(safe-area-inset-left))] pr-[max(1.5rem,env(safe-area-inset-right))] md:p-12 bg-[#0a0a0c]"
       style={{
         paddingTop: isIOS 
           ? 'calc(max(1.5rem, env(safe-area-inset-top)) + 0.75rem)' 
           : 'max(1.5rem, env(safe-area-inset-top))'
       }}
     >
-      <div className="w-full max-w-[420px] mb-8 flex flex-col items-center">
-        <div className="flex items-center justify-between w-full mb-8">
+      <div className="w-full max-w-[420px] mb-4 md:mb-8 flex flex-col items-center">
+        <div className="flex items-center justify-between w-full mb-4 md:mb-8">
             <div className="flex items-center gap-2">
                 <button onClick={() => setIsMenuOpen(true)} className="p-3.5 rounded-2xl bg-white/5 border border-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition-all shadow-xl active:scale-90 relative">
                     <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>
@@ -390,8 +392,8 @@ const App: React.FC = () => {
         </div>
       </div>
 
-      <div className="flex items-center justify-center mb-10 relative">
-          <PuzzleBoard board={board} gridSize={gridSize} imageUrl={imageUrl} onTileClick={handleMove} spacing={spacing} movingTileIdx={movingTileIdx} clueTileIdx={clueTileIdx} showNumbers={showNumbers} tileShape={tileShape} />
+      <div className="flex items-center justify-center mb-6 md:mb-10 relative flex-1">
+          <PuzzleBoard board={board} gridSize={gridSize} imageUrl={imageUrl} onTileClick={handleMove} spacing={spacing} movingTileIdx={movingTileIdx} clueTileIdx={clueTileIdx} showNumbers={showNumbers} tileShape={tileShape} numberSize={numberSize} />
           
           {showShuffleAlert && (
             <div className="absolute inset-0 z-[90] flex items-center justify-center bg-black/80 backdrop-blur-md rounded-3xl animate-pop p-6">
@@ -413,7 +415,7 @@ const App: React.FC = () => {
           )}
       </div>
 
-      <div className="w-full max-w-[420px] pb-12">
+      <div className="w-full max-w-[420px] pb-6 md:pb-12">
           <Controls onShuffle={shuffle} onSolve={solve} onClue={getClue} onUndo={undo} isSolving={isSolving} canUndo={!isSolving && undoStack.length > 0} />
       </div>
 
@@ -447,6 +449,8 @@ const App: React.FC = () => {
         setShowNumbers={setShowNumbers} 
         tileShape={tileShape} 
         setTileShape={setTileShape} 
+        numberSize={numberSize}
+        setNumberSize={setNumberSize}
         imageHistory={imageHistory} 
         onSelectHistoryImage={handleSelectHistoryImage} 
         onPickImage={pickImage} 

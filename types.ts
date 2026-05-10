@@ -6,6 +6,7 @@ export type GridSize = {
 
 export type Difficulty = 'Easy' | 'Medium' | 'Hard';
 export type TileShape = 'rounded' | 'square';
+export type NumberSize = 'Big' | 'Small';
 
 export interface GameState {
   board: number[];
@@ -18,6 +19,7 @@ export interface GameState {
   spacing: number;
   showNumbers: boolean;
   tileShape: TileShape;
+  numberSize: NumberSize;
 }
 
 export interface StatsEntry {

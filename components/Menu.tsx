@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { GridSize, Difficulty, StatsEntry, TileShape } from '../types';
+import { GridSize, Difficulty, StatsEntry, TileShape, NumberSize } from '../types';
 
 interface MenuProps {
   isOpen: boolean;
@@ -14,6 +14,8 @@ interface MenuProps {
   setShowNumbers: (v: boolean) => void;
   tileShape: TileShape;
   setTileShape: (s: TileShape) => void;
+  numberSize: NumberSize;
+  setNumberSize: (s: NumberSize) => void;
   imageHistory: string[];
   onSelectHistoryImage: (url: string) => void;
   onPickImage: (e: React.ChangeEvent<HTMLInputElement>) => void;
@@ -23,19 +25,13 @@ interface MenuProps {
 const Menu: React.FC<MenuProps> = ({
   isOpen, onClose, gridSize, setGridSize, difficulty, setDifficulty,
   spacing, setSpacing, showNumbers, setShowNumbers, tileShape, setTileShape,
+  numberSize, setNumberSize,
   imageHistory, onSelectHistoryImage, onPickImage, onLoadSaved
 }) => {
   const [activeSubView, setActiveSubView] = useState<'main' | 'instructions' | 'about'>('main');
   const [isUploadExpanded, setIsUploadExpanded] = useState(false);
 
-  const version = useMemo(() => {
-    const now = new Date();
-    const yy = String(now.getFullYear()).slice(-2);
-    const mm = String(now.getMonth() + 1).padStart(2, '0');
-    const dd = String(now.getDate()).padStart(2, '0');
-    const build = "5"; 
-    return `${yy}.${mm}.${dd}-${build}`;
-  }, []);
+  const version = "26.05.10-1";
 
   if (!isOpen) return null;
 
@@ -222,6 +218,25 @@ const Menu: React.FC<MenuProps> = ({
                             onClick={() => setTileShape(s)}
                             className={`flex-1 py-3 rounded-xl text-xs font-bold transition-all border uppercase tracking-widest ${
                                 tileShape === s 
+                                ? 'bg-blue-600 border-blue-400 text-white shadow-lg' 
+                                : 'bg-slate-800 border-white/5 text-slate-400'
+                            }`}
+                        >
+                            {s.toUpperCase()}
+                        </button>
+                    ))}
+                </div>
+            </section>
+
+            <section>
+                <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em] mb-3">Number Size</h3>
+                <div className="flex gap-2">
+                    {(['Big', 'Small'] as NumberSize[]).map(s => (
+                        <button 
+                            key={s} 
+                            onClick={() => setNumberSize(s)}
+                            className={`flex-1 py-3 rounded-xl text-xs font-bold transition-all border uppercase tracking-widest ${
+                                numberSize === s 
                                 ? 'bg-blue-600 border-blue-400 text-white shadow-lg' 
                                 : 'bg-slate-800 border-white/5 text-slate-400'
                             }`}
